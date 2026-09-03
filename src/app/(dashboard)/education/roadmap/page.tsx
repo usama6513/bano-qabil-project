@@ -295,7 +295,7 @@ export default function RoadmapPage() {
           {/* TREE DIAGRAM VIEW */}
           {viewMode === 'tree' && (
             <div className="card overflow-x-auto">
-              <div className="flex flex-col items-center gap-0 py-4 min-w-[600px]">
+              <div className="flex flex-col items-center gap-0 py-4 min-w-[320px] md:min-w-[600px]">
                 {/* Root node */}
                 <div className="relative flex flex-col items-center">
                   <div className="px-6 py-3 rounded-xl bg-gradient-to-r from-primary-600 to-secondary-600 text-white font-bold text-sm shadow-lg">
@@ -429,7 +429,8 @@ export default function RoadmapPage() {
           {/* TIMELINE VIEW */}
           {viewMode === 'timeline' && (
             <div className="relative">
-              <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-white/10 hidden sm:block">
+              {/* Vertical line - desktop only */}
+              <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-white/10 hidden sm:block" />
               <div className="space-y-6">
                 {roadmap.map((step, idx) => {
                   const color = phaseColors[idx % phaseColors.length];
@@ -450,11 +451,11 @@ export default function RoadmapPage() {
                           {allDone ? '✓' : step.step}
                         </div>
                       </div>
-                      <div className={`flex-1 rounded-xl border-2 transition-all hover:shadow-md ${allDone ? 'border-green-500/30 bg-emerald-500/10' : `${color.border} ${color.bg}`} p-5`}>
+                      <div className={`flex-1 rounded-xl border-2 transition-all hover:shadow-md ${allDone ? 'border-green-500/30 bg-emerald-500/10' : `${color.border} ${color.bg}`} p-3 sm:p-5`}>
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 flex-wrap mb-1">
-                              <h3 className="font-bold text-gray-100 text-lg">{step.title}</h3>
+                              <h3 className="font-bold text-gray-100 text-base sm:text-lg">{step.title}</h3>
                               {allDone && <span className="text-xs bg-green-500/10 text-green-400 px-2 py-0.5 rounded-full font-medium">Completed</span>}
                             </div>
                             {step.timeframe && (
@@ -465,7 +466,7 @@ export default function RoadmapPage() {
                             <span className="text-xs text-gray-500 font-medium whitespace-nowrap">{doneCount}/{step.tasks.length}</span>
                           )}
                         </div>
-                        <p className="text-sm text-gray-300 leading-relaxed mb-3">{step.description}</p>
+                        <p className="text-xs sm:text-sm text-gray-300 leading-relaxed mb-3">{step.description}</p>
                         {step.tasks.length > 0 && (
                           <div className="space-y-1.5">
                             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Action Items</p>
@@ -476,7 +477,7 @@ export default function RoadmapPage() {
                                   <div className={`flex-shrink-0 mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${isChecked ? 'bg-green-500 border-green-500' : 'border-white/10 group-hover:border-primary-400'}`}>
                                     {isChecked && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
                                   </div>
-                                  <span className={`text-sm leading-snug ${isChecked ? 'line-through text-gray-400' : 'text-gray-300 group-hover:text-gray-100'}`}>{task}</span>
+                                  <span className={`text-xs sm:text-sm leading-snug ${isChecked ? 'line-through text-gray-400' : 'text-gray-300 group-hover:text-gray-100'}`}>{task}</span>
                                 </button>
                               );
                             })}
@@ -488,7 +489,7 @@ export default function RoadmapPage() {
                           </div>
                         )}
                         {step.milestone && (
-                          <div className={`mt-3 p-3 rounded-lg border ${allDone ? 'bg-green-500/10 border-green-500/20' : 'bg-amber-500/10 border-amber-500/20'}`}>
+                          <div className={`mt-3 p-2 sm:p-3 rounded-lg border ${allDone ? 'bg-green-500/10 border-green-500/20' : 'bg-amber-500/10 border-amber-500/20'}`}>
                             <div className="flex items-center gap-2">
                               <span className="text-sm">{allDone ? '🎯' : '🏁'}</span>
                               <p className={`text-xs font-semibold ${allDone ? 'text-green-400' : 'text-amber-400'}`}>Milestone: {step.milestone}</p>
@@ -499,7 +500,6 @@ export default function RoadmapPage() {
                     </div>
                   );
                 })}
-              </div>
               </div>
             </div>
           )}

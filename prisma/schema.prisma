@@ -194,6 +194,8 @@ model University {
   feeRange           String?            @map("fee_range")            // e.g. "PKR 150,000-300,000/semester"
   admissionProcess   String?            @map("admission_process")    // how to apply step by step
   scholarshipsOffered String?           @map("scholarships_offered") // uni-specific scholarships
+  admissionDates     String?            @map("admission_dates")      // e.g. "Fall: Aug-Oct, Spring: Jan-Mar"
+  examSystem         String?            @map("exam_system")          // "semester" or "yearly" or "mixed"
 
   courses              Course[]
   departments          Department[]

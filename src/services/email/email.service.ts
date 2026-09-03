@@ -161,6 +161,69 @@ If you didn't request a password reset, you can safely ignore this email. Your p
       text,
     });
   }
+  async sendVerificationCodeEmail(to: string, code: string): Promise<{ success: boolean; previewUrl?: string; error?: string }> {
+    const appName = process.env.NEXT_PUBLIC_APP_NAME || 'EduGuard AI';
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify Your Email</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 12px; margin-top: 40px; margin-bottom: 40px;">
+    <tr>
+      <td style="padding: 40px 30px;">
+        <h1 style="color: #f1f5f9; font-size: 24px; margin: 0 0 8px 0; text-align: center;">
+          &#x2709; Verify Your Email
+        </h1>
+        <p style="color: #94a3b8; font-size: 14px; text-align: center; margin: 0 0 30px 0;">
+          ${appName}
+        </p>
+
+        <p style="color: #e2e8f0; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+          Thank you for registering! Use the verification code below to activate your account.
+        </p>
+
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin: 30px 0;">
+          <tr>
+            <td align="center">
+              <div style="display: inline-block; padding: 20px 50px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); border-radius: 12px;">
+                <span style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #ffffff; font-family: 'Courier New', monospace;">${code}</span>
+              </div>
+            </td>
+          </tr>
+        </table>
+
+        <p style="color: #94a3b8; font-size: 14px; text-align: center; margin: 0 0 10px 0;">
+          This code expires in <strong style="color: #f59e0b;">15 minutes</strong>.
+        </p>
+        <p style="color: #64748b; font-size: 13px; text-align: center; margin: 0 0 30px 0;">
+          If you didn't create an account, you can safely ignore this email.
+        </p>
+
+        <hr style="border: none; border-top: 1px solid #334155; margin: 30px 0;">
+
+        <p style="color: #475569; font-size: 12px; margin: 0; text-align: center;">
+          &copy; ${new Date().getFullYear()} ${appName}. All rights reserved.
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    const text = `Verify Your Email — ${appName}\n\nYour verification code is: ${code}\n\nThis code expires in 15 minutes.\n\nIf you didn't create an account, you can safely ignore this email.\n\n© ${new Date().getFullYear()} ${appName}. All rights reserved.`;
+
+    return this.sendEmail({
+      to,
+      subject: `Verify Your Email — ${appName}`,
+      html,
+      text,
+    });
+  }
 }
 
 export const emailService = new EmailService();

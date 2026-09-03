@@ -11,6 +11,7 @@ interface Country {
   currency: string;
   language: string;
   scholarshipCount: number;
+  universityCount: number;
   costOfLivingIndex: number;
   isPopular?: boolean;
 }
@@ -27,21 +28,34 @@ function getFlagEmoji(code: string): string {
 export default function CountriesPage() {
   const [countries, setCountries] = useState<Country[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [region, setRegion] = useState('All');
   const [popularOnly, setPopularOnly] = useState(false);
 
   const fetchCountries = useCallback(async (q: string) => {
     setLoading(true);
-    try {
-      const res = q
-        ? await apiClient.get<{ data: { countries: Country[] } }>(`/api/countries/search?q=${encodeURIComponent(q)}`)
-        : await apiClient.get<{ data: { countries: Country[] } }>('/api/countries');
-      setCountries(res.data.countries || []);
-    } catch {
-      setCountries([]);
-    } finally {
-      setLoading(false);
+    setError(null);
+    const maxRetries = 2;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const res = q
+          ? await apiClient.get<{ data: { countries: Country[] } }>(`/api/countries/search?q=${encodeURIComponent(q)}`)
+          : await apiClient.get<{ data: Country[] }>('/api/countries');
+        const countries = res.data && 'countries' in res.data ? res.data.countries : (Array.isArray(res.data) ? res.data : []);
+        setCountries(countries || []);
+        setLoading(false);
+        return;
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        if (attempt < maxRetries - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)));
+        } else {
+          setError(msg.includes('Authentication') ? 'Session expired. Please log in again.' : 'Failed to load countries. Please try again.');
+          setCountries([]);
+          setLoading(false);
+        }
+      }
     }
   }, []);
 
@@ -111,6 +125,17 @@ export default function CountriesPage() {
             </div>
           ))}
         </div>
+      ) : error ? (
+        <div className="card text-center py-12">
+          <span className="text-4xl">️</span>
+          <p className="text-gray-400 mt-3">{error}</p>
+          <button
+            onClick={() => fetchCountries(query.trim())}
+            className="mt-4 px-6 py-2 rounded-xl font-medium text-sm bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:from-blue-600 hover:to-cyan-600 transition-all"
+          >
+            Retry
+          </button>
+        </div>
       ) : visible.length === 0 ? (
         <div className="card text-center py-12">
           <span className="text-4xl">🌍</span>
@@ -144,11 +169,15 @@ export default function CountriesPage() {
                     <dd className="text-gray-300 font-medium">{c.language}</dd>
                   </div>
                   <div className="flex justify-between">
+                    <dt className="text-gray-500">Universities</dt>
+                    <dd className="text-blue-400 font-semibold">{c.universityCount ?? 0}</dd>
+                  </div>
+                  <div className="flex justify-between">
                     <dt className="text-gray-500">Scholarships</dt>
                     <dd className="text-primary-600 font-semibold">{c.scholarshipCount ?? 0}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-gray-500">Cost of Living Index</dt>
+                    <dt className="text-gray-500">Cost of Living</dt>
                     <dd className="text-gray-300 font-medium">{c.costOfLivingIndex != null ? `${c.costOfLivingIndex}/100` : 'N/A'}</dd>
                   </div>
                 </dl>

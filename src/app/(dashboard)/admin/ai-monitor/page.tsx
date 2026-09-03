@@ -106,13 +106,14 @@ function MetricRow({
   );
 }
 
-function SuccessGauge({ rate }: { rate: number }) {
-  const pct = clamp(rate * 100);
+function SuccessGauge({ rate, total }: { rate: number; total: number }) {
+  const hasData = total > 0;
+  const pct = hasData ? clamp(rate * 100) : 0;
   const radius = 56;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - pct / 100);
-  const color = pct >= 95 ? "#34d399" : pct >= 80 ? "#fbbf24" : "#fb7185";
-  const label = pct >= 95 ? "Excellent" : pct >= 80 ? "Needs attention" : "Degraded";
+  const color = !hasData ? "#94a3b8" : pct >= 95 ? "#34d399" : pct >= 80 ? "#fbbf24" : "#fb7185";
+  const label = !hasData ? "No data" : pct >= 95 ? "Excellent" : pct >= 80 ? "Needs attention" : "Degraded";
 
   return (
     <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:gap-6">
@@ -133,8 +134,8 @@ function SuccessGauge({ rate }: { rate: number }) {
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-3xl font-bold tabular-nums gradient-text">{pct.toFixed(1)}%</span>
-          <span className="text-xs bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">success</span>
+          <span className="text-3xl font-bold tabular-nums gradient-text">{hasData ? `${pct.toFixed(1)}%` : "—"}</span>
+          <span className="text-xs bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">{hasData ? "success" : "tracked"}</span>
         </div>
       </div>
       <div className="space-y-3">
@@ -146,8 +147,11 @@ function SuccessGauge({ rate }: { rate: number }) {
           {label}
         </span>
         <p className="max-w-xs text-xs leading-relaxed text-cyan-400">
-          Based on tracked AI request outcomes. Values above <span className="text-cyan-400">95%</span> indicate <span className="text-emerald-400">healthy</span> prompt handling
-          and stable provider connectivity.
+          {hasData ? (
+            <>Based on tracked AI request outcomes. Values above <span className="text-cyan-400">95%</span> indicate <span className="text-emerald-400">healthy</span> prompt handling and stable provider connectivity.</>
+          ) : (
+            <>No AI calls have been tracked yet. Start using the AI assistant to see success rate metrics here.</>
+          )}
         </p>
       </div>
     </div>
@@ -406,7 +410,7 @@ export default function AiMonitorPage() {
 
         <div className="grid gap-4 lg:grid-cols-2">
           <Panel title="AI Quality Indicators" subtitle="Success rate of tracked model calls">
-            <SuccessGauge rate={aiMetrics.successRate} />
+            <SuccessGauge rate={aiMetrics.successRate} total={aiMetrics.total} />
           </Panel>
 
           <Panel title="Recent AI Activity" subtitle="Today vs weekly momentum">

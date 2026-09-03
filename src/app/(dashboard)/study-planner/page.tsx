@@ -36,28 +36,59 @@ interface WeeklySummary {
   subjectBreakdown: { subject: string; minutes: number; sessions: number }[];
 }
 
+interface Diagnostic {
+  overallScore: number;
+  summary: string;
+  strengths: { subject: string; detail: string }[];
+  weaknesses: { subject: string; topic: string; detail: string; recommendation: string }[];
+  revisionUrgency: { subject: string; topic: string; daysSinceStudied: number; recommendation: string }[];
+  studyPatternInsights: string[];
+  weeklyTrend: string;
+}
+
+interface PerformanceData {
+  subjects: {
+    subject: string;
+    totalSessions: number;
+    totalMinutes: number;
+    averageQuizScore: number;
+    trend: string;
+    trendPercentage: number;
+    topics: { topic: string; masteryLevel: number; needsRevision: boolean; diagnostic: string; averageQuizScore: number }[];
+  }[];
+  diagnostic: Diagnostic;
+  totalStudyMinutes: number;
+  totalQuizzes: number;
+  averageQuizScore: number;
+  activeRevisionPlans: number;
+  overdueRevisions: number;
+}
+
 export default function StudyPlannerPage() {
   const [profile, setProfile] = useState<LearningProfile | null>(null);
   const [plans, setPlans] = useState<StudyPlan[]>([]);
   const [weakSubjects, setWeakSubjects] = useState<WeakSubject[]>([]);
   const [weeklySummary, setWeeklySummary] = useState<WeeklySummary | null>(null);
+  const [perfData, setPerfData] = useState<PerformanceData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [profileRes, plansRes, weakRes, summaryRes] = await Promise.allSettled([
+        const [profileRes, plansRes, weakRes, summaryRes, perfRes] = await Promise.allSettled([
           apiClient.get<{ data: LearningProfile | null }>('/api/study'),
           apiClient.get<{ data: StudyPlan[] }>('/api/study/plans'),
           apiClient.get<{ data: WeakSubject[] }>('/api/study/weak-subjects'),
           apiClient.get<{ data: WeeklySummary }>('/api/study/weekly-summary'),
+          apiClient.get<{ data: PerformanceData }>('/api/study/performance'),
         ]);
 
         if (profileRes.status === 'fulfilled') setProfile(profileRes.value.data);
         if (plansRes.status === 'fulfilled') setPlans(plansRes.value.data || []);
         if (weakRes.status === 'fulfilled') setWeakSubjects(weakRes.value.data || []);
         if (summaryRes.status === 'fulfilled') setWeeklySummary(summaryRes.value.data);
+        if (perfRes.status === 'fulfilled') setPerfData(perfRes.value.data);
       } catch {
         setError('Failed to load study planner data');
       } finally {
@@ -266,6 +297,219 @@ export default function StudyPlannerPage() {
           )}
         </div>
       </div>
+
+      {/* ── AI STUDY INTELLIGENCE ── */}
+      {perfData && perfData.diagnostic ? (
+        <div className="bg-gradient-to-br from-white/[0.04] to-white/[0.02] rounded-2xl shadow-xl p-6 border border-violet-500/20">
+          <div className="flex items-center gap-2 mb-5">
+            <span className="text-3xl">🧠</span>
+            <h2 className="text-xl font-bold bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">AI Study Intelligence</h2>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Readiness Score */}
+            <div className="bg-gradient-to-br from-white/[0.03] to-white/[0.01] rounded-xl p-5 border border-white/[0.08] text-center">
+              <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">Overall Readiness</p>
+              <div className="relative w-28 h-28 mx-auto mb-3">
+                <svg className="w-28 h-28 transform -rotate-90" viewBox="0 0 120 120">
+                  <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="10" />
+                  <circle cx="60" cy="60" r="52" fill="none" stroke={perfData.diagnostic.overallScore >= 75 ? '#10b981' : perfData.diagnostic.overallScore >= 50 ? '#3b82f6' : perfData.diagnostic.overallScore >= 30 ? '#f59e0b' : '#ef4444'} strokeWidth="10" strokeDasharray={`${(perfData.diagnostic.overallScore / 100) * 327} 327`} strokeLinecap="round" />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-3xl font-bold gradient-text">{perfData.diagnostic.overallScore}</span>
+                </div>
+              </div>
+              <p className={`text-sm font-semibold ${perfData.diagnostic.weeklyTrend === 'improving' ? 'text-emerald-400' : perfData.diagnostic.weeklyTrend === 'declining' ? 'text-red-400' : 'text-amber-400'}`}>
+                {perfData.diagnostic.weeklyTrend === 'improving' ? '📈 Improving' : perfData.diagnostic.weeklyTrend === 'declining' ? '📉 Declining' : '➡️ Stable'}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">{perfData.diagnostic.summary}</p>
+            </div>
+
+            {/* Priority Focus Areas */}
+            <div className="bg-gradient-to-br from-white/[0.03] to-white/[0.01] rounded-xl p-5 border border-white/[0.08]">
+              <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">🎯 Priority Focus Areas</p>
+              {perfData.diagnostic.weaknesses.length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-emerald-400 text-sm">✅ No critical weaknesses!</p>
+                  <p className="text-xs text-gray-500 mt-1">Keep up the good work</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {perfData.diagnostic.weaknesses.slice(0, 4).map((w, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <span className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                        i === 0 ? 'bg-red-500/20 text-red-400' : i === 1 ? 'bg-orange-500/20 text-orange-400' : 'bg-amber-500/20 text-amber-400'
+                      }`}>{i + 1}</span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium gradient-text">{w.subject} / {w.topic}</p>
+                        <p className="text-xs text-gray-500">{w.detail}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Quick Stats */}
+            <div className="bg-gradient-to-br from-white/[0.03] to-white/[0.01] rounded-xl p-5 border border-white/[0.08]">
+              <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">Study Metrics</p>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-400">Total Study Time</span>
+                  <span className="text-sm font-bold gradient-text">{Math.round(perfData.totalStudyMinutes / 60)}h {perfData.totalStudyMinutes % 60}m</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-400">Quizzes Taken</span>
+                  <span className="text-sm font-bold gradient-text">{perfData.totalQuizzes}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-400">Avg Quiz Score</span>
+                  <span className={`text-sm font-bold ${perfData.averageQuizScore >= 75 ? 'text-emerald-400' : perfData.averageQuizScore >= 50 ? 'text-amber-400' : 'text-red-400'}`}>{perfData.averageQuizScore}%</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-400">Active Revisions</span>
+                  <span className="text-sm font-bold gradient-text">{perfData.activeRevisionPlans}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-400">Overdue Revisions</span>
+                  <span className={`text-sm font-bold ${perfData.overdueRevisions > 0 ? 'text-red-400' : 'text-emerald-400'}`}>{perfData.overdueRevisions}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Overdue Revisions Alert */}
+          {perfData.diagnostic.revisionUrgency.length > 0 && (
+            <div className="mt-4 bg-gradient-to-br from-red-500/[0.06] to-orange-500/[0.04] rounded-xl p-4 border-2 border-red-500/20">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xl">🚨</span>
+                <h3 className="text-sm font-bold text-red-400">Urgent Revisions Needed</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {perfData.diagnostic.revisionUrgency.slice(0, 4).map((r, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs">
+                    <span className="text-orange-400">⏰</span>
+                    <span className="text-gray-300"><strong>{r.subject}/{r.topic}</strong> — {r.recommendation}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Study Pattern Insights */}
+          {perfData.diagnostic.studyPatternInsights.length > 0 && (
+            <div className="mt-4 bg-gradient-to-br from-blue-500/[0.06] to-cyan-500/[0.04] rounded-xl p-4 border-2 border-blue-500/20">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xl">💡</span>
+                <h3 className="text-sm font-bold text-blue-400">Study Pattern Insights</h3>
+              </div>
+              <div className="space-y-1.5">
+                {perfData.diagnostic.studyPatternInsights.map((insight, i) => (
+                  <p key={i} className="text-xs text-gray-300 flex items-start gap-2">
+                    <span className="text-blue-400 mt-0.5">•</span>
+                    {insight}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="bg-gradient-to-br from-white/[0.04] to-white/[0.02] rounded-2xl shadow-xl p-6 border border-violet-500/20 opacity-60">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-3xl">🧠</span>
+            <h2 className="text-xl font-bold bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">AI Study Intelligence</h2>
+          </div>
+          <div className="text-center py-6">
+            <div className="text-4xl mb-3">📊</div>
+            <p className="text-gray-400 text-sm">Start logging study sessions and taking quizzes to unlock AI-powered insights.</p>
+            <p className="text-xs text-gray-500 mt-1">Your readiness score, weak areas, and study patterns will appear here.</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── IMPROVEMENT ROADMAP ── */}
+      {perfData && perfData.subjects.length > 0 ? (
+        <div className="bg-gradient-to-br from-white/[0.04] to-white/[0.02] rounded-2xl shadow-xl p-6 border border-emerald-500/20">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-3xl">🗺️</span>
+            <h2 className="text-xl font-bold bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">Your Improvement Roadmap</h2>
+          </div>
+          <p className="text-sm text-gray-400 mb-4">Based on your study data, here&apos;s where to focus your effort for maximum improvement:</p>
+
+          <div className="space-y-3">
+            {perfData.subjects
+              .sort((a, b) => a.averageQuizScore - b.averageQuizScore)
+              .map((sub) => {
+                const needsWork = sub.averageQuizScore < 60;
+                const isDeclining = sub.trend === 'declining';
+                const weakTopics = sub.topics.filter(t => t.masteryLevel < 50);
+                return (
+                  <div key={sub.subject} className={`rounded-xl p-4 border-2 transition-all ${
+                    needsWork || isDeclining ? 'bg-gradient-to-br from-red-500/[0.06] to-orange-500/[0.04] border-red-500/20' :
+                    sub.averageQuizScore < 75 ? 'bg-gradient-to-br from-amber-500/[0.06] to-yellow-500/[0.04] border-amber-500/20' :
+                    'bg-gradient-to-br from-emerald-500/[0.06] to-teal-500/[0.04] border-emerald-500/20'
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{needsWork ? '🔴' : sub.averageQuizScore < 75 ? '🟡' : '🟢'}</span>
+                        <h3 className="font-bold gradient-text">{sub.subject}</h3>
+                        {isDeclining && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">DECLINING</span>}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-gray-500">
+                        <span>Quiz avg: <strong className={sub.averageQuizScore >= 75 ? 'text-emerald-400' : sub.averageQuizScore >= 50 ? 'text-amber-400' : 'text-red-400'}>{sub.averageQuizScore}%</strong></span>
+                        <span>{sub.totalSessions} sessions</span>
+                        <span>{Math.round(sub.totalMinutes / 60)}h studied</span>
+                      </div>
+                    </div>
+
+                    {weakTopics.length > 0 && (
+                      <div className="mt-2 space-y-1.5">
+                        <p className="text-xs font-semibold text-gray-400">Topics that need work:</p>
+                        {weakTopics.slice(0, 3).map(t => (
+                          <div key={t.topic} className="flex items-center gap-2 text-xs">
+                            <span className="text-orange-400">⚠️</span>
+                            <span className="text-gray-300"><strong>{t.topic}</strong> — Mastery: {t.masteryLevel}%</span>
+                            <span className="text-gray-500 italic ml-auto">{t.diagnostic}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {needsWork && (
+                      <div className="mt-2 flex items-start gap-2">
+                        <span className="text-emerald-400 text-xs">💡</span>
+                        <p className="text-xs text-emerald-400">
+                          <strong>Recommended:</strong> Focus {sub.averageQuizScore < 40 ? '70% of your study time' : '50% of your study time'} on {sub.subject}. 
+                          {weakTopics.length > 0 ? ` Start with: ${weakTopics.slice(0, 2).map(t => t.topic).join(', ')}.` : ' Practice more quizzes and review fundamentals.'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+          </div>
+
+          {perfData.subjects.length === 0 && (
+            <div className="text-center py-8">
+              <div className="text-5xl mb-3">📝</div>
+              <p className="text-gray-400">No study data yet. Start logging study sessions and quizzes to see your personalized roadmap.</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="bg-gradient-to-br from-white/[0.04] to-white/[0.02] rounded-2xl shadow-xl p-6 border border-emerald-500/20 opacity-60">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-3xl">🗺️</span>
+            <h2 className="text-xl font-bold bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">Your Improvement Roadmap</h2>
+          </div>
+          <div className="text-center py-6">
+            <div className="text-4xl mb-3">🎯</div>
+            <p className="text-gray-400 text-sm">Once you start studying, we&apos;ll identify your weak topics and create a personalized improvement plan.</p>
+            <p className="text-xs text-gray-500 mt-1">Subject-wise focus areas with time allocation recommendations will appear here.</p>
+          </div>
+        </div>
+      )}
 
       {weeklySummary && (
         <div className="bg-gradient-to-br from-white/[0.04] to-white/[0.02] rounded-2xl shadow-xl p-6 border border-purple-500/20">

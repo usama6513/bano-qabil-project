@@ -155,6 +155,98 @@ export default function BudgetPage() {
 
   const maxCategoryAmount = Math.max(...Object.values(categoryBreakdown), 1);
 
+  // ── SMART FINANCIAL INSIGHTS ─────────────────────────────────────────────
+  const NEEDS_CATS = ['rent', 'bills', 'utilities', 'healthcare', 'education', 'groceries'];
+
+  const { needs, wants, savings503020 } = (() => {
+    let n = 0, w = 0;
+    for (const [cat, amt] of Object.entries(categoryBreakdown)) {
+      if (NEEDS_CATS.includes(cat.toLowerCase())) n += amt;
+      else w += amt;
+    }
+    return { needs: n, wants: w, savings503020: Math.max(0, totalIncome - n - w) };
+  })();
+
+  const ideal50 = totalIncome * 0.5;
+  const ideal30 = totalIncome * 0.3;
+  const ideal20 = totalIncome * 0.2;
+
+  // Financial Health Score (0-100)
+  const healthScore = (() => {
+    let score = 50; // start neutral
+    if (savingsRate >= 20) score += 20;
+    else if (savingsRate >= 10) score += 10;
+    else if (savingsRate < 0) score -= 30;
+    else if (savingsRate < 5) score -= 15;
+    if (needs <= ideal50) score += 10; else if (needs > ideal50 * 1.3) score -= 10;
+    if (wants <= ideal30) score += 10; else if (wants > ideal30 * 1.3) score -= 10;
+    if (Object.keys(categoryBreakdown).length >= 3) score += 5; // diversified tracking
+    if (totalExpenses === 0 && totalIncome > 0) score = 40; // no data yet
+    return Math.max(0, Math.min(100, Math.round(score)));
+  })();
+
+  const healthLabel = healthScore >= 80 ? 'Excellent' : healthScore >= 60 ? 'Good' : healthScore >= 40 ? 'Needs Work' : 'Critical';
+  const healthColor = healthScore >= 80 ? 'emerald' : healthScore >= 60 ? 'blue' : healthScore >= 40 ? 'amber' : 'red';
+
+  // Generate actionable recommendations
+  const recommendations: { icon: string; title: string; detail: string; saving: string; priority: 'high' | 'medium' | 'low' }[] = [];
+  const sortedCats = Object.entries(categoryBreakdown).sort(([, a], [, b]) => b - a);
+  const topCategory = sortedCats[0];
+
+  if (topCategory) {
+    const [catName, catAmt] = topCategory;
+    const catPct = totalIncome > 0 ? (catAmt / totalIncome) * 100 : 0;
+    const lower = catName.toLowerCase();
+
+    if (lower === 'food' && catPct > 20) {
+      const potentialSaving = Math.round(catAmt * 0.4);
+      recommendations.push({ icon: '🍔', title: 'Reduce Food Spending', detail: `You spend ${currencySymbol}${catAmt.toLocaleString()} on food (${Math.round(catPct)}% of income). Cook at home instead of ordering — save 40%.`, saving: `${currencySymbol}${potentialSaving.toLocaleString()}/mo`, priority: 'high' });
+    }
+    if (lower === 'transport' && catPct > 15) {
+      const potentialSaving = Math.round(catAmt * 0.3);
+      recommendations.push({ icon: '🚗', title: 'Optimize Transport', detail: `Transport costs ${currencySymbol}${catAmt.toLocaleString()}/mo. Use public transport or carpool to cut 30%.`, saving: `${currencySymbol}${potentialSaving.toLocaleString()}/mo`, priority: 'high' });
+    }
+    if (lower === 'shopping' && catPct > 15) {
+      const potentialSaving = Math.round(catAmt * 0.5);
+      recommendations.push({ icon: '🛍️', title: 'Cut Unnecessary Shopping', detail: `Shopping at ${currencySymbol}${catAmt.toLocaleString()}. Buy only essentials — wait 48hrs before non-essential purchases.`, saving: `${currencySymbol}${potentialSaving.toLocaleString()}/mo`, priority: 'high' });
+    }
+    if (lower === 'entertainment' && catPct > 10) {
+      const potentialSaving = Math.round(catAmt * 0.35);
+      recommendations.push({ icon: '🎬', title: 'Trim Entertainment', detail: `Entertainment: ${currencySymbol}${catAmt.toLocaleString()}. Share family plans, use free alternatives.`, saving: `${currencySymbol}${potentialSaving.toLocaleString()}/mo`, priority: 'medium' });
+    }
+    if (lower === 'rent' && catPct > 40) {
+      recommendations.push({ icon: '🏠', title: 'Rent is Too High', detail: `Rent takes ${Math.round(catPct)}% of income. Consider a roommate or cheaper area. Target: under 30% of income.`, saving: `${currencySymbol}${Math.round(catAmt - totalIncome * 0.3).toLocaleString()}/mo`, priority: 'high' });
+    }
+  }
+
+  // Add general recommendations if specific ones don't cover enough
+  if (savingsRate < 20 && totalIncome > 0) {
+    const gap = Math.round(ideal20 - (totalIncome - totalExpenses));
+    if (gap > 0) {
+      recommendations.push({ icon: '🎯', title: 'Increase Savings Rate', detail: `Your savings rate is ${savingsRate.toFixed(1)}%. Target 20% (${currencySymbol}${Math.round(ideal20).toLocaleString()}/mo). You need to save ${currencySymbol}${gap.toLocaleString()} more.`, saving: `${currencySymbol}${gap.toLocaleString()}/mo`, priority: 'high' });
+    }
+  }
+
+  if (savingsRate >= 20 && recommendations.length === 0) {
+    recommendations.push({ icon: '✅', title: 'Great Savings Rate!', detail: `You're saving ${savingsRate.toFixed(1)}% of income. Consider investing surplus in savings goals or emergency fund.`, saving: '', priority: 'low' });
+  }
+
+  if (totalExpenses === 0 && totalIncome > 0) {
+    recommendations.push({ icon: '📝', title: 'Start Tracking Expenses', detail: 'You haven\'t added any expenses yet. Add your expenses to get personalized recommendations on where to cut.', saving: '', priority: 'medium' });
+  }
+
+  if (totalIncome === 0) {
+    recommendations.push({ icon: '💰', title: 'Add Your Income', detail: 'Setup your monthly income first so we can calculate your budget ratios and give personalized advice.', saving: '', priority: 'medium' });
+  }
+
+  // Add 50/30/20 rule recommendation if applicable
+  if (needs > ideal50 && totalIncome > 0) {
+    recommendations.push({ icon: '📊', title: 'Needs Exceed 50% Rule', detail: `Your needs (${currencySymbol}${Math.round(needs).toLocaleString()}) exceed the recommended 50% (${currencySymbol}${Math.round(ideal50).toLocaleString()}). Review essential expenses.`, saving: `${currencySymbol}${Math.round(needs - ideal50).toLocaleString()}/mo`, priority: 'medium' });
+  }
+  if (wants > ideal30 && totalIncome > 0) {
+    recommendations.push({ icon: '⚡', title: 'Wants Exceed 30% Rule', detail: `Your wants (${currencySymbol}${Math.round(wants).toLocaleString()}) exceed the recommended 30% (${currencySymbol}${Math.round(ideal30).toLocaleString()}). Cut discretionary spending.`, saving: `${currencySymbol}${Math.round(wants - ideal30).toLocaleString()}/mo`, priority: 'medium' });
+  }
+
   const handleApplyBudget = async () => {
     if (!budgetPlan) return;
     setIsApplying(true);
@@ -431,6 +523,141 @@ export default function BudgetPage() {
               <p className="text-xs text-gray-500 mt-1">{savingsRate >= 20 ? '✅ Great!' : savingsRate >= 10 ? '👍 Good' : '⚠️ Improve'}</p>
             </div>
           </div>
+
+          {/* ── FINANCIAL HEALTH SCORE ── */}
+          {budgetProfile && totalIncome > 0 && (
+            <div className="bg-gradient-to-br from-white/[0.04] to-white/[0.02] rounded-2xl shadow-xl p-6 border border-purple-500/20">
+              <div className="flex items-center gap-2 mb-5">
+                <span className="text-3xl">🧠</span>
+                <h2 className="text-xl font-bold bg-gradient-to-r from-purple-400 to-fuchsia-400 bg-clip-text text-transparent">Smart Financial Insights</h2>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                {/* Health Score */}
+                <div className="bg-gradient-to-br from-white/[0.03] to-white/[0.01] rounded-xl p-5 border border-white/[0.08] text-center">
+                  <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">Financial Health Score</p>
+                  <div className="relative w-28 h-28 mx-auto mb-3">
+                    <svg className="w-28 h-28 transform -rotate-90" viewBox="0 0 120 120">
+                      <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="10" />
+                      <circle cx="60" cy="60" r="52" fill="none" stroke={healthColor === 'emerald' ? '#10b981' : healthColor === 'blue' ? '#3b82f6' : healthColor === 'amber' ? '#f59e0b' : '#ef4444'} strokeWidth="10" strokeDasharray={`${(healthScore / 100) * 327} 327`} strokeLinecap="round" />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-3xl font-bold gradient-text">{healthScore}</span>
+                    </div>
+                  </div>
+                  <p className={`text-sm font-semibold ${healthColor === 'emerald' ? 'text-emerald-400' : healthColor === 'blue' ? 'text-blue-400' : healthColor === 'amber' ? 'text-amber-400' : 'text-red-400'}`}>{healthLabel}</p>
+                  <p className="text-xs text-gray-500 mt-1">{savingsRate >= 20 ? '✅ Great savings habit' : savingsRate >= 10 ? '👍 Room to improve' : savingsRate >= 0 ? '⚠️ Savings too low' : '🚨 Spending exceeds income'}</p>
+                </div>
+
+                {/* 50/30/20 Rule */}
+                <div className="bg-gradient-to-br from-white/[0.03] to-white/[0.01] rounded-xl p-5 border border-white/[0.08]">
+                  <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">50/30/20 Budget Rule</p>
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-blue-400 font-medium">🏠 Needs (50%)</span>
+                        <span className="gradient-text">{currencySymbol}{Math.round(needs).toLocaleString()} / {currencySymbol}{Math.round(ideal50).toLocaleString()}</span>
+                      </div>
+                      <div className="w-full bg-white/5 rounded-full h-2.5">
+                        <div className={`h-2.5 rounded-full transition-all ${needs > ideal50 ? 'bg-red-500' : 'bg-blue-500'}`} style={{ width: `${Math.min(100, ideal50 > 0 ? (needs / ideal50) * 50 : 0)}%` }} />
+                      </div>
+                      {needs > ideal50 && <p className="text-xs text-red-400 mt-1">⚠️ Over by {currencySymbol}{Math.round(needs - ideal50).toLocaleString()}</p>}
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-amber-400 font-medium">🎉 Wants (30%)</span>
+                        <span className="gradient-text">{currencySymbol}{Math.round(wants).toLocaleString()} / {currencySymbol}{Math.round(ideal30).toLocaleString()}</span>
+                      </div>
+                      <div className="w-full bg-white/5 rounded-full h-2.5">
+                        <div className={`h-2.5 rounded-full transition-all ${wants > ideal30 ? 'bg-red-500' : 'bg-amber-500'}`} style={{ width: `${Math.min(100, ideal30 > 0 ? (wants / ideal30) * 30 : 0)}%` }} />
+                      </div>
+                      {wants > ideal30 && <p className="text-xs text-red-400 mt-1">⚠️ Over by {currencySymbol}{Math.round(wants - ideal30).toLocaleString()}</p>}
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-emerald-400 font-medium">🎯 Savings (20%)</span>
+                        <span className="gradient-text">{currencySymbol}{Math.round(savings503020).toLocaleString()} / {currencySymbol}{Math.round(ideal20).toLocaleString()}</span>
+                      </div>
+                      <div className="w-full bg-white/5 rounded-full h-2.5">
+                        <div className={`h-2.5 rounded-full transition-all ${savings503020 >= ideal20 ? 'bg-emerald-500' : 'bg-orange-500'}`} style={{ width: `${Math.min(100, ideal20 > 0 ? (savings503020 / ideal20) * 20 : 0)}%` }} />
+                      </div>
+                      {savings503020 < ideal20 && <p className="text-xs text-amber-400 mt-1">Need {currencySymbol}{Math.round(ideal20 - savings503020).toLocaleString()} more to hit 20%</p>}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Stats */}
+                <div className="bg-gradient-to-br from-white/[0.03] to-white/[0.01] rounded-xl p-5 border border-white/[0.08]">
+                  <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">Key Metrics</p>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-400">Daily Spending Limit</span>
+                      <span className="text-sm font-bold gradient-text">
+                        {(() => {
+                          const daysLeft = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() - new Date().getDate();
+                          const remaining = totalIncome - totalExpenses;
+                          return remaining > 0 && daysLeft > 0 ? `${currencySymbol}${Math.round(remaining / daysLeft).toLocaleString()}` : `${currencySymbol}0`;
+                        })()}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-400">Monthly Savings</span>
+                      <span className={`text-sm font-bold ${totalIncome - totalExpenses >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {currencySymbol}{(totalIncome - totalExpenses).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-400">Expense Categories</span>
+                      <span className="text-sm font-bold gradient-text">{Object.keys(categoryBreakdown).length}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-400">Top Category</span>
+                      <span className="text-sm font-bold gradient-text">{topCategory ? topCategory[0] : '—'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-400">Budget Status</span>
+                      <span className={`text-sm font-bold ${savingsRate >= 20 ? 'text-emerald-400' : savingsRate >= 10 ? 'text-amber-400' : savingsRate >= 0 ? 'text-orange-400' : 'text-red-400'}`}>
+                        {savingsRate >= 20 ? '✅ On Track' : savingsRate >= 10 ? '⚠️ Tight' : savingsRate >= 0 ? '🔴 Low Savings' : '🚨 Deficit'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── ACTIONABLE RECOMMENDATIONS ── */}
+          {recommendations.length > 0 && budgetProfile && (
+            <div className="bg-gradient-to-br from-white/[0.04] to-white/[0.02] rounded-2xl shadow-xl p-6 border border-amber-500/20">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-3xl">💡</span>
+                <h2 className="text-xl font-bold bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">What You Should Do</h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {recommendations.map((rec, i) => (
+                  <div key={i} className={`rounded-xl p-4 border-2 transition-all hover:scale-[1.01] ${
+                    rec.priority === 'high' ? 'bg-gradient-to-br from-red-500/[0.06] to-orange-500/[0.04] border-red-500/20' :
+                    rec.priority === 'medium' ? 'bg-gradient-to-br from-amber-500/[0.06] to-yellow-500/[0.04] border-amber-500/20' :
+                    'bg-gradient-to-br from-emerald-500/[0.06] to-teal-500/[0.04] border-emerald-500/20'
+                  }`}>
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl">{rec.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-sm font-bold gradient-text">{rec.title}</h3>
+                          {rec.priority === 'high' && <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">HIGH</span>}
+                        </div>
+                        <p className="text-xs text-gray-400 mb-2">{rec.detail}</p>
+                        {rec.saving && (
+                          <p className="text-xs font-semibold text-emerald-400">💰 Potential saving: {rec.saving}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="card">

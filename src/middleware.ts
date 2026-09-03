@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 
 const protectedApiRoutes = ['/api/chat', '/api/ai', '/api/documents', '/api/fraud', '/api/urls', '/api/budget', '/api/study', '/api/teacher', '/api/voice', '/api/users', '/api/admin', '/api/profile', '/api/account', '/api/settings', '/api/memory', '/api/audit', '/api/orchestrate', '/api/sources', '/api/verification', '/api/countries', '/api/notifications', '/api/cost-plans'];
 
-const publicApiRoutes = ['/api/auth/login', '/api/auth/register', '/api/auth/forgot-password', '/api/auth/reset-password', '/api/auth/refresh', '/api/education', '/api/chat/department'];
+const publicApiRoutes = ['/api/auth/login', '/api/auth/register', '/api/auth/forgot-password', '/api/auth/reset-password', '/api/auth/refresh', '/api/auth/send-verification', '/api/auth/verify-email', '/api/auth/resend-verification', '/api/education', '/api/chat/department'];
 
 const ALLOWED_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS || 'http://localhost:3000').split(',').map(s => s.trim());
 

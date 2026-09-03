@@ -1,8 +1,9 @@
 const { PrismaClient } = require('@prisma/client');
 const p = new PrismaClient();
 
-// Map: exact DB name → knowledge data
+// Map: exact DB name → knowledge data (9 fields each)
 const uniKnowledge = {
+  // ===== TOP 15 PAKISTANI UNIVERSITIES =====
   'uni-pk-071': { // NUST
     closingMerit: 'BS Electrical Eng: 90%, BS CS (SEECS): 92%, BS Mechanical: 88%, BS Civil: 86%, BBA: 89%, BS Maths: 84%. Merit = Matric (10%) + Intermediate (15%) + NET test (75%).',
     entryTestDetails: 'NET (NUST Entry Test): 200 MCQs — Mathematics 80, Physics 60, English 30, Intelligence 30. Duration: 3 hours. No negative marking. Held twice a year (Jan & Jul).',
@@ -11,6 +12,8 @@ const uniKnowledge = {
     feeRange: 'PKR 170,000-230,000 per semester. BS Engineering: ~PKR 190,000/sem. BS CS: ~PKR 210,000/sem. BBA: ~PKR 180,000/sem. Hostel: PKR 45,000-60,000/sem.',
     admissionProcess: '1. Apply online at admissions.nust.edu.pk. 2. Pay PKR 2,500 application fee. 3. Appear for NET test. 4. Merit list: Matric (10%) + FSc/A-Levels (15%) + NET (75%). 5. If selected, pay admission fee and submit documents. 6. Attend orientation.',
     scholarshipsOffered: 'NUST Merit Scholarship (full tuition for CGPA 3.7+), NUST Need-Based Scholarship (50-100% tuition waiver for low-income), NUST Sports Scholarship, HEC Need-Based applicable, PEEF for Punjab students.',
+    admissionDates: 'Fall: July-September. Spring: December-February. NET offered twice a year (January and July). Two intake cycles annually.',
+    examSystem: 'semester',
   },
   'uni-pk-006': { // LUMS
     closingMerit: 'BS CS: 93-95%, BBA: 91-93%, BS Electrical Eng: 88%, BS Maths: 85%, BS Economics: 87%, BS Chemistry: 80%. Merit = SAT/LAT (50%) + A-Levels/FSc (30%) + O-Levels/Matric (20%).',
@@ -20,6 +23,8 @@ const uniKnowledge = {
     feeRange: 'PKR 350,000-450,000 per semester. BS CS: ~PKR 420,000/sem. BBA: ~PKR 430,000/sem. Hostel: PKR 80,000-120,000/sem.',
     admissionProcess: '1. Apply at lums.edu.pk/admissions. 2. Pay PKR 3,000 fee. 3. Submit SAT/LAT scores. 4. Shortlisted candidates called for interview. 5. Final merit = SAT/LAT (50%) + A-Levels/FSc (30%) + O-Levels (20%). 6. Financial aid available.',
     scholarshipsOffered: 'LUMS National Financial Aid (NFA) — up to 100% tuition for family income < PKR 50,000/month. LUMS Merit Scholarship (CGPA 3.8+). HEC Need-Based. PEEF for Punjab. Zakat Fund. Christian Financial Aid.',
+    admissionDates: 'Fall: June-August. Spring: November-January. LAT offered multiple times. Early admission opens in April.',
+    examSystem: 'semester',
   },
   '50903858-cd6b-47b3-8e1b-0a531981c123': { // FAST-NUCES
     closingMerit: 'BS CS (Islamabad): 88%, BS CS (Lahore): 90%, BS CS (Karachi): 85%, BS SE: 84%, BS EE: 80%, BBA: 82%. Merit = FSc/Matric (50%) + FAST Entry Test (50%).',
@@ -29,6 +34,8 @@ const uniKnowledge = {
     feeRange: 'PKR 120,000-180,000 per semester. BS CS: ~PKR 160,000/sem. BS SE: ~PKR 155,000/sem. BS EE: ~PKR 145,000/sem. BBA: ~PKR 140,000/sem.',
     admissionProcess: '1. Apply at admissions.nu.edu.pk. 2. Pay PKR 2,000 fee. 3. Appear for FAST Entry Test (FET). 4. Merit = Matric/FSc (50%) + FET (50%). 5. Merit list on website. 6. Pay fee and submit documents.',
     scholarshipsOffered: 'FAST Merit Scholarship (50-100% for CGPA 3.5+), FAST Need-Based Aid (up to 75% for low-income), HEC Need-Based, PEEF for Punjab, Chughtai Scholarship for orphans.',
+    admissionDates: 'Fall: July-September. Spring: December-February. Campuses: Islamabad, Lahore, Karachi, Peshawar, Chiniot-Faisalabad.',
+    examSystem: 'semester',
   },
   'uni-pk-007': { // UET Lahore
     closingMerit: 'BS Electrical Eng: 91%, BS Mechanical: 89%, BS Civil: 87%, BS CS: 90%, BS Chemical: 85%, BS Architecture: 86%. Merit = FSc Pre-Eng (70%) + Matric (15%) + ECAT (15%).',
@@ -38,6 +45,8 @@ const uniKnowledge = {
     feeRange: 'PKR 60,000-90,000 per semester (public sector). BS Engineering: ~PKR 75,000/sem. Hostel: PKR 15,000-25,000/sem. Cheapest top engineering university.',
     admissionProcess: '1. Apply at uet.edu.pk/admissions. 2. Appear for ECAT (conducted by UET for all Punjab). 3. Merit = FSc Pre-Eng (70%) + Matric (15%) + ECAT (15%). 4. Provincial merit list for Punjab. 5. Federal quota for other provinces.',
     scholarshipsOffered: 'UET Merit Scholarship (free education for top 5%), UET Need-Based Aid (full waiver for income < PKR 30,000), HEC Need-Based, PEEF, Punjab CM Scholarship, UET Alumni Endowment Fund.',
+    admissionDates: 'Admissions: June-August. ECAT conducted in August. Fall semester starts in September. Single annual intake.',
+    examSystem: 'semester',
   },
   'uni-pk-001': { // Punjab University
     closingMerit: 'BS CS: 85%, BBA: 83%, BS Economics: 80%, BS Psychology: 78%, BS English: 75%, LLB: 82%. Merit varies by department — some use entry test, some marks only.',
@@ -47,6 +56,8 @@ const uniKnowledge = {
     feeRange: 'PKR 25,000-60,000 per semester (public sector). BS CS: ~PKR 45,000/sem. BBA: ~PKR 40,000/sem. LLB: ~PKR 30,000/sem. Cheapest major university.',
     admissionProcess: '1. Apply at pu.edu.pk/admissions. 2. Pay PKR 1,000-2,000 fee. 3. Merit = intermediate marks + entry test (where applicable). 4. Department-wise merit lists. 5. Submit documents and fee.',
     scholarshipsOffered: 'PU Merit Scholarship (free education for top performers), PU Need-Based Aid, HEC Need-Based, PEEF for Punjab, Bait-ul-Maal, Punjab Honhaar Scholarship.',
+    admissionDates: 'Admissions: June-September. Annual intake. Some departments also have Spring intake (January-March). Merit lists announced July-October.',
+    examSystem: 'yearly',
   },
   'uni-pk-072': { // COMSATS
     closingMerit: 'BS CS (Islamabad): 86%, BS EE (Islamabad): 82%, BS CS (Lahore): 84%, BS CS (Abbottabad): 80%, BBA: 81%, BS Pharmacy: 79%. Merit = FSc (50%) + COMSATS Test (30%) + Matric (20%).',
@@ -56,6 +67,8 @@ const uniKnowledge = {
     feeRange: 'PKR 100,000-160,000 per semester. BS CS: ~PKR 140,000/sem. BS EE: ~PKR 130,000/sem. BBA: ~PKR 120,000/sem.',
     admissionProcess: '1. Apply at comsats.edu.pk/admissions. 2. Pay PKR 2,000 fee. 3. Appear for COMSATS Entry Test or submit NTS/NAT. 4. Merit = FSc (50%) + Test (30%) + Matric (20%). 5. Campus-wise merit list.',
     scholarshipsOffered: 'COMSATS Merit Scholarship (50-100% for CGPA 3.5+), COMSATS Need-Based Aid (up to 75%), HEC Need-Based, PEEF for Punjab, Faculty children discount (25%).',
+    admissionDates: 'Fall: July-September. Spring: December-February. Campuses: Islamabad, Lahore, Abbottabad, Wah, Sahiwal, Vehari, Attock.',
+    examSystem: 'semester',
   },
   'uni-pk-158': { // GIKI
     closingMerit: 'BS Electrical Eng: 88%, BS Mechanical: 85%, BS CS: 90%, BS Chemical: 83%, BS Metallurgy: 80%. Merit = FSc/A-Levels (40%) + GIKI Test (40%) + Matric/O-Levels (20%).',
@@ -65,6 +78,8 @@ const uniKnowledge = {
     feeRange: 'PKR 250,000-350,000 per semester. BS Engineering: ~PKR 300,000/sem. BS CS: ~PKR 310,000/sem. Hostel + meals: PKR 80,000/sem.',
     admissionProcess: '1. Apply at giki.edu.pk/admissions. 2. Pay PKR 3,500 fee. 3. Appear for GIKI Test at Topi. 4. Merit = FSc (40%) + GIKI Test (40%) + Matric (20%). 5. Interview for shortlisted.',
     scholarshipsOffered: 'GIKI Merit Scholarship (full tuition for CGPA 3.7+), GIKI Need-Based Aid (up to 100%), HEC Need-Based, PEEF, GIKI Endowment Fund, KPK domicile scholarships.',
+    admissionDates: 'Admissions: June-August. GIKI Test: August. Fall semester starts September. Single annual intake.',
+    examSystem: 'semester',
   },
   'uni-pk-037': { // Karachi University
     closingMerit: 'BS CS: 80%, BBA: 78%, BS Economics: 75%, BS Physics: 70%, BS Chemistry: 68%. Merit mainly on intermediate marks. Some departments have entry test.',
@@ -74,6 +89,8 @@ const uniKnowledge = {
     feeRange: 'PKR 20,000-50,000 per semester (public sector). BS CS: ~PKR 40,000/sem. BBA: ~PKR 35,000/sem.',
     admissionProcess: '1. Apply at uok.edu.pk/admissions. 2. Pay PKR 1,000-2,000 fee. 3. Merit = intermediate marks (+ entry test where applicable). 4. Merit list announced.',
     scholarshipsOffered: 'KU Merit Scholarship (free education for top 5%), KU Need-Based Aid, HEC Need-Based, Sindh CM Scholarship, Sindh Government Merit Scholarship, Bait-ul-Maal.',
+    admissionDates: 'Admissions: June-September. Annual intake. Some departments have Spring intake (January-February). Merit lists July-October.',
+    examSystem: 'yearly',
   },
   'uni-pk-075': { // Air University
     closingMerit: 'BS CS: 82%, BS EE: 79%, BS SE: 80%, BBA: 78%, BS Avionics: 76%. Merit = FSc (50%) + AU Entry Test (30%) + Matric (20%).',
@@ -83,6 +100,8 @@ const uniKnowledge = {
     feeRange: 'PKR 100,000-150,000 per semester. BS CS: ~PKR 130,000/sem. BS EE: ~PKR 120,000/sem.',
     admissionProcess: '1. Apply at au.edu.pk/admissions. 2. Pay PKR 2,000 fee. 3. Appear for AU Entry Test or submit NTS score. 4. Merit list. 5. Submit documents.',
     scholarshipsOffered: 'AU Merit Scholarship (50-100% for CGPA 3.5+), AU Need-Based Aid, PAF Scholarship (for PAF employees children), HEC Need-Based, PEEF.',
+    admissionDates: 'Fall: July-September. Spring: January-March. Campuses: Islamabad (main), Kamra, Multan, Jacobabad.',
+    examSystem: 'semester',
   },
   'uni-pk-074': { // Bahria University
     closingMerit: 'BS CS (Islamabad): 80%, BS CS (Karachi): 78%, BS EE: 75%, BBA: 77%, BS Pharmacy: 73%. Merit = FSc (50%) + Bahria Test (30%) + Matric (20%).',
@@ -92,6 +111,8 @@ const uniKnowledge = {
     feeRange: 'PKR 90,000-140,000 per semester. BS CS: ~PKR 120,000/sem. BBA: ~PKR 110,000/sem.',
     admissionProcess: '1. Apply at bahria.edu.pk/admissions. 2. Pay PKR 1,500 fee. 3. Appear for Bahria Entry Test or submit NTS. 4. Merit list.',
     scholarshipsOffered: 'Bahria Merit Scholarship (50% for CGPA 3.5+), Bahria Need-Based Aid, Pakistan Navy Scholarship (for Navy employees children), HEC Need-Based.',
+    admissionDates: 'Fall: July-September. Spring: January-March. Campuses: Islamabad, Karachi, Lahore.',
+    examSystem: 'semester',
   },
   'uni-pk-041': { // Aga Khan University
     closingMerit: 'MBBS: 93% (most competitive medical). BS Nursing: 85%. BSc Health Sciences: 80%. Merit = FSc Pre-Medical (40%) + AKU Test (40%) + Interview (20%).',
@@ -101,6 +122,8 @@ const uniKnowledge = {
     feeRange: 'MBBS: PKR 1,800,000-2,200,000/year. BS Nursing: PKR 400,000-500,000/year. Hostel: PKR 150,000-200,000/year.',
     admissionProcess: '1. Apply at aku.edu/admissions. 2. Pay PKR 5,000 fee. 3. Appear for AKU Entry Test. 4. Shortlisted for interview. 5. Merit = FSc (40%) + Test (40%) + Interview (20%).',
     scholarshipsOffered: 'AKU Merit Scholarship (full tuition for top performers), AKU Need-Based Aid (up to 100%), Aga Khan Fund for Education (AKFEB), HEC Need-Based.',
+    admissionDates: 'MBBS admissions: September-November. Entry test: November. Interview: December. Classes start January. Single annual intake.',
+    examSystem: 'semester',
   },
   'uni-pk-070': { // QAU
     closingMerit: 'BS CS: 84%, BS Physics: 75%, BS Maths: 73%, BS Chemistry: 70%, BS Bio Sciences: 72%, BS Economics: 78%. Merit = FSc (60%) + QAU Test (30%) + Matric (10%).',
@@ -110,6 +133,8 @@ const uniKnowledge = {
     feeRange: 'PKR 40,000-70,000 per semester (public sector). BS CS: ~PKR 60,000/sem. BS Physics: ~PKR 45,000/sem.',
     admissionProcess: '1. Apply at qau.edu.pk/admissions. 2. Pay PKR 2,000 fee. 3. Appear for QAU Entry Test or submit NTS. 4. Merit list announced.',
     scholarshipsOffered: 'QAU Merit Scholarship (free education for top 5%), QAU Need-Based Aid (full waiver for low-income), HEC Need-Based, PEEF, Bait-ul-Maal, Federal government scholarships.',
+    admissionDates: 'Fall: July-September. Spring: January-March. Located in Islamabad. Public sector university.',
+    examSystem: 'semester',
   },
   'uni-pk-038': { // NED University
     closingMerit: 'BS Electrical Eng: 89%, BS Mechanical: 87%, BS Civil: 85%, BS CS: 88%, BS Chemical: 83%, BS Architecture: 84%. Merit = FSc Pre-Eng (70%) + Matric (15%) + NED Entry Test (15%).',
@@ -119,6 +144,8 @@ const uniKnowledge = {
     feeRange: 'PKR 50,000-80,000 per semester (public sector). BS Engineering: ~PKR 65,000/sem. Hostel: PKR 12,000-20,000/sem.',
     admissionProcess: '1. Apply at neduet.edu.pk/admissions. 2. Appear for NED Entry Test. 3. Merit = FSc (70%) + Matric (15%) + NED Test (15%). 4. Sindh provincial merit list.',
     scholarshipsOffered: 'NED Merit Scholarship (free education for top 5%), NED Need-Based Aid, HEC Need-Based, Sindh CM Scholarship, Sindh Government Merit Scholarship.',
+    admissionDates: 'Admissions: June-August. NED Entry Test: August. Fall starts September. Single annual intake. Sindh domicile preferred.',
+    examSystem: 'semester',
   },
   'uni-pk-046': { // SZABIST
     closingMerit: 'BS CS (Karachi): 82%, BS CS (Islamabad): 80%, BBA: 79%, BS SE: 78%, BS Media Sciences: 75%. Merit = FSc (50%) + SZABIST Test (30%) + Matric (20%).',
@@ -128,6 +155,8 @@ const uniKnowledge = {
     feeRange: 'PKR 110,000-160,000 per semester. BS CS: ~PKR 140,000/sem. BBA: ~PKR 130,000/sem.',
     admissionProcess: '1. Apply at saibaust.edu.pk/admissions. 2. Pay PKR 2,000 fee. 3. Appear for SZABIST Entry Test or submit NTS. 4. Merit list.',
     scholarshipsOffered: 'SZABIST Merit Scholarship (50-100% for CGPA 3.5+), SZABIST Need-Based Aid, HEC Need-Based, PEEF for Punjab, Sindh provincial scholarships.',
+    admissionDates: 'Fall: July-September. Spring: January-March. Campuses: Karachi (main), Islamabad, Larkana, Hyderabad.',
+    examSystem: 'semester',
   },
   'uni-pk-073': { // IIUI
     closingMerit: 'BS CS: 80%, BBA: 78%, BS EE: 76%, BS Pharmacy: 74%, BS English: 72%. Merit = FSc (50%) + IIUI Entry Test (30%) + Matric (20%). Separate merit for male/female campuses.',
@@ -137,17 +166,221 @@ const uniKnowledge = {
     feeRange: 'PKR 80,000-130,000 per semester. BS CS: ~PKR 110,000/sem. BBA: ~PKR 100,000/sem.',
     admissionProcess: '1. Apply at iiui.edu.pk/admissions. 2. Pay PKR 2,000 fee. 3. Appear for IIUI Entry Test or submit NTS. 4. Merit list announced.',
     scholarshipsOffered: 'IIUI Merit Scholarship (50-100% for CGPA 3.5+), IIUI Need-Based Aid, HEC Need-Based, PEEF, Hifz-e-Scholarship for Quran memorizers.',
+    admissionDates: 'Fall: August-October. Spring: February-March. Separate male/female campuses. Islamabad.',
+    examSystem: 'semester',
+  },
+
+  // ===== 20 MORE PAKISTANI UNIVERSITIES =====
+  'uni-pk-002': { // IBA Karachi
+    closingMerit: 'BS CS: 88%, BBA: 90% (most competitive), BS Economics: 82%. Merit = SAT/IBA Test (50%) + HSC/FSc (30%) + SSC/Matric (20%).',
+    entryTestDetails: 'IBA Admission Test: 100 MCQs — Quantitative 40, Verbal 30, Analytical 30. Duration: 2.5 hours. SAT scores (min 1100) also accepted as alternative.',
+    isOpenMerit: false,
+    supplyPolicy: 'Failed course: retake next semester. CGPA below 2.0: probation. Below 1.5: dismissed. Maximum 8 semesters for BS.',
+    feeRange: 'PKR 130,000-180,000 per semester. BS CS: ~PKR 160,000/sem. BBA: ~PKR 170,000/sem. One of the best business schools in Pakistan.',
+    admissionProcess: '1. Apply at iba.edu.pk/admissions. 2. Pay PKR 3,000 fee. 3. Appear for IBA Admission Test or submit SAT. 4. Interview for shortlisted. 5. Merit list.',
+    scholarshipsOffered: 'IBA Merit Scholarship (50-100% for top performers), IBA Need-Based Financial Aid, HEC Need-Based, PEEF, Alumni-funded scholarships.',
+    admissionDates: 'Fall: June-August. Spring: November-January. Located in Karachi. Premier business school of Pakistan.',
+    examSystem: 'semester',
+  },
+  'uni-pk-003': { // IoBM Karachi
+    closingMerit: 'BS CS: 82%, BBA: 84%, BS EE: 78%, BS Accounting: 80%. Merit = IoBM Test (40%) + FSc (35%) + Matric (25%).',
+    entryTestDetails: 'IoBM Admission Test: 80 MCQs — Quantitative 30, Verbal 25, Analytical 15, GK 10. Duration: 2 hours. Also accepts NTS/NAT scores.',
+    isOpenMerit: true,
+    supplyPolicy: 'Failed course: retake next semester. CGPA below 2.0: warning. Below 1.5: probation. Maximum 8 semesters for BS.',
+    feeRange: 'PKR 100,000-150,000 per semester. BS CS: ~PKR 130,000/sem. BBA: ~PKR 135,000/sem.',
+    admissionProcess: '1. Apply at iobm.edu.pk/admissions. 2. Pay PKR 2,500 fee. 3. Appear for IoBM Test. 4. Merit list. 5. Submit documents.',
+    scholarshipsOffered: 'IoBM Merit Scholarship (25-100% for CGPA 3.5+), Need-Based Aid, HEC Need-Based, Faculty children discount.',
+    admissionDates: 'Fall: July-September. Spring: January-March. Located in Karachi. Known for business and CS programs.',
+    examSystem: 'semester',
+  },
+  'uni-pk-004': { // LSE Lahore
+    closingMerit: 'BS CS: 84%, BBA: 82%, BS EE: 78%, BS Accounting: 80%, BS Economics: 76%. Merit = LSE Test (40%) + FSc (35%) + Matric (25%).',
+    entryTestDetails: 'LSE Entry Test: 80 MCQs — Quantitative 30, Verbal 25, Analytical 15, Subject-based 10. Duration: 2 hours.',
+    isOpenMerit: true,
+    supplyPolicy: 'Failed course: retake next semester. CGPA below 2.0: probation. Maximum 3 consecutive semesters below 2.0: dismissed.',
+    feeRange: 'PKR 90,000-140,000 per semester. BS CS: ~PKR 120,000/sem. BBA: ~PKR 125,000/sem.',
+    admissionProcess: '1. Apply at lse.edu.pk/admissions. 2. Pay PKR 2,000 fee. 3. Appear for LSE Entry Test. 4. Merit list. 5. Submit documents.',
+    scholarshipsOffered: 'LSE Merit Scholarship (50-100% for top performers), LSE Need-Based Aid, HEC Need-Based, PEEF.',
+    admissionDates: 'Fall: July-September. Spring: January-March. Located in Lahore. Growing reputation in CS and business.',
+    examSystem: 'semester',
+  },
+  'uni-pk-005': { // GCU Lahore
+    closingMerit: 'BS CS: 80%, BBA: 78%, BS Physics: 72%, BS Maths: 70%, BS Chemistry: 68%, BS Botany: 65%. Merit = FSc (60%) + Entry Test (25%) + Matric (15%).',
+    entryTestDetails: 'GCU Entry Test: 60 MCQs — subject-based 30, English 15, Analytical 15. Duration: 1.5 hours.',
+    isOpenMerit: true,
+    supplyPolicy: 'Annual system for some departments, semester for others. Failed: supplementary within 6 months. Maximum 3 chances.',
+    feeRange: 'PKR 20,000-45,000 per semester (public sector). BS CS: ~PKR 35,000/sem. BBA: ~PKR 30,000/sem.',
+    admissionProcess: '1. Apply at gcu.edu.pk/admissions. 2. Pay PKR 1,500 fee. 3. Appear for entry test. 4. Merit list. 5. Submit documents.',
+    scholarshipsOffered: 'GCU Merit Scholarship (free for top 5%), Need-Based Aid, HEC Need-Based, PEEF, Punjab provincial scholarships.',
+    admissionDates: 'Admissions: June-September. Annual intake. Merit lists July-October. Historic public university in Lahore.',
+    examSystem: 'mixed',
+  },
+  'uni-pk-008': { // Dow University of Health Sciences
+    closingMerit: 'MBBS: 91%, BDS: 89%, BS Nursing: 82%, Pharmacy: 78%, BS Medical Technology: 80%. Merit = FSc Pre-Medical (50%) + Dow Test (35%) + Matric (15%).',
+    entryTestDetails: 'Dow Medical Entry Test: 200 MCQs — Biology 60, Chemistry 50, Physics 40, English 30, Logical 20. Duration: 3 hours. Among toughest medical entry tests.',
+    isOpenMerit: false,
+    supplyPolicy: 'Very strict for medical. Failed professional exam: supplementary within 6 months. 3+ subjects failed: repeat year. Max 3 attempts.',
+    feeRange: 'MBBS: PKR 800,000-1,200,000/year. BDS: PKR 700,000-1,000,000/year. BS Nursing: PKR 200,000-300,000/year.',
+    admissionProcess: '1. Apply at duhs.edu.pk/admissions. 2. Pay PKR 5,000 fee. 3. Appear for Dow Entry Test. 4. Merit + interview. 5. Sindh domicile required.',
+    scholarshipsOffered: 'Dow Merit Scholarship (full tuition for top performers), Dow Need-Based Aid, HEC Need-Based, Sindh CM Scholarship, PEEF.',
+    admissionDates: 'MBBS/BDS admissions: August-October. Entry test: October. Classes start November. Single annual intake. Karachi.',
+    examSystem: 'semester',
+  },
+  'uni-pk-009': { // Hamdard University
+    closingMerit: 'BS CS: 75%, BBA: 73%, BS Pharmacy: 77%, BS EE: 70%, MBBS: 85%. Merit = FSc (50%) + Entry Test (30%) + Matric (20%).',
+    entryTestDetails: 'Hamdard Entry Test: 80 MCQs — subject-based 40, English 20, Analytical 10, GK 10. Duration: 1.5 hours.',
+    isOpenMerit: true,
+    supplyPolicy: 'Failed course: retake next semester. CGPA below 2.0: probation. Maximum 3 semesters below 2.0: expelled.',
+    feeRange: 'PKR 70,000-120,000 per semester. BS CS: ~PKR 95,000/sem. BBA: ~PKR 90,000/sem. MBBS: ~PKR 400,000/sem.',
+    admissionProcess: '1. Apply at hamdard.edu.pk/admissions. 2. Pay PKR 2,000 fee. 3. Appear for Hamdard Entry Test. 4. Merit list. 5. Submit documents.',
+    scholarshipsOffered: 'Hamdard Merit Scholarship (50-100%), Hamdard Need-Based Aid, HEC Need-Based, PEEF, Bait-ul-Maal, Waqf-e-Hamdard scholarships.',
+    admissionDates: 'Fall: July-September. Spring: January-March. Campuses: Karachi (main), Islamabad. Known for pharmacy and medical.',
+    examSystem: 'semester',
+  },
+  'uni-pk-010': { // Habib University
+    closingMerit: 'BS CS: 85%, BS EE: 80%, BS Liberal Arts: 75%. Merit = SAT/HU Test (50%) + A-Levels/FSc (30%) + O-Levels/Matric (20%). Interview mandatory.',
+    entryTestDetails: 'Habib University Test: 100 MCQs — Quantitative 30, Verbal 25, Analytical 25, Subject 20. Duration: 2.5 hours. SAT accepted (min 1200). Interview required for all.',
+    isOpenMerit: false,
+    supplyPolicy: 'Failed course: retake next semester. CGPA below 2.0: probation. Below 1.5 for 2 semesters: dismissed. Maximum 8 semesters for BS.',
+    feeRange: 'PKR 280,000-380,000 per semester. BS CS: ~PKR 350,000/sem. Liberal Arts: ~PKR 300,000/sem. Most expensive private university.',
+    admissionProcess: '1. Apply at habib.edu.pk/admissions. 2. Pay PKR 3,500 fee. 3. Submit SAT or appear for HU Test. 4. Interview (mandatory). 5. Final decision.',
+    scholarshipsOffered: 'Habib Merit Scholarship (25-100%), Habib Need-Based Aid (up to full tuition), HEC Need-Based. 80%+ students receive financial aid.',
+    admissionDates: 'Fall: June-August. Single annual intake. Located in Karachi. Liberal arts education model.',
+    examSystem: 'semester',
+  },
+  'uni-pk-011': { // FCCU Lahore
+    closingMerit: 'BS CS: 80%, BBA: 78%, BS Economics: 72%, BS Psychology: 70%, BS English: 68%. Merit = FSc (40%) + Entry Test (35%) + Matric (25%).',
+    entryTestDetails: 'FC Entrance Test: 60 MCQs — English 20, Quantitative 15, Analytical 15, GK 10. Duration: 1.5 hours.',
+    isOpenMerit: true,
+    supplyPolicy: 'Semester system. Failed course: retake next semester. CGPA below 2.0: probation. Maximum 3 chances per course.',
+    feeRange: 'PKR 80,000-130,000 per semester. BS CS: ~PKR 110,000/sem. BBA: ~PKR 115,000/sem.',
+    admissionProcess: '1. Apply at fu.edu.pk/admissions. 2. Pay PKR 2,000 fee. 3. Appear for FC Entrance Test. 4. Merit list. 5. Interview for some programs.',
+    scholarshipsOffered: 'FC Merit Scholarship (50-100%), Need-Based Aid, Minority scholarships, HEC Need-Based, PEEF, Alumni-funded scholarships.',
+    admissionDates: 'Fall: July-September. Spring: January-March. Historic university in Lahore. Liberal arts tradition.',
+    examSystem: 'semester',
+  },
+  'uni-pk-012': { // Gomal University
+    closingMerit: 'BS CS: 75%, BS EE: 72%, BS Pharmacy: 74%, BBA: 70%, BS Agriculture: 65%. Merit = FSc (50%) + Entry Test (30%) + Matric (20%).',
+    entryTestDetails: 'Gomal Entry Test: 80 MCQs — subject-based 40, English 20, Analytical 10, GK 10. Duration: 2 hours.',
+    isOpenMerit: true,
+    supplyPolicy: 'Failed course: retake next semester. CGPA below 2.0: probation. Maximum 3 semesters below 2.0: expelled.',
+    feeRange: 'PKR 35,000-60,000 per semester (public sector). BS CS: ~PKR 50,000/sem. BS Agriculture: ~PKR 40,000/sem.',
+    admissionProcess: '1. Apply at gu.edu.pk/admissions. 2. Pay PKR 1,500 fee. 3. Appear for entry test. 4. Merit list. 5. Submit documents.',
+    scholarshipsOffered: 'GUM Merit Scholarship, Need-Based Aid, HEC Need-Based, PEEF, KPK provincial scholarships.',
+    admissionDates: 'Fall: July-September. Spring: January-March. Located in Dera Ismail Khan, KPK.',
+    examSystem: 'semester',
+  },
+  'uni-pk-013': { // MUET Jamshoro
+    closingMerit: 'BS Electrical Eng: 82%, BS Mechanical: 78%, BS Civil: 75%, BS CS: 80%, BS Chemical: 73%. Merit = FSc Pre-Eng (60%) + MUET Test (25%) + Matric (15%).',
+    entryTestDetails: 'MUET Entry Test: 100 MCQs — Mathematics 30, Physics 25, Chemistry 20, English 15, Logical 10. Duration: 2 hours. Sindh domicile required.',
+    isOpenMerit: true,
+    supplyPolicy: 'Supply exam within 3 months. Maximum 4 supplies per semester. CGPA below 1.75: removed from rolls.',
+    feeRange: 'PKR 40,000-70,000 per semester (public sector). BS Engineering: ~PKR 55,000/sem. Hostel: PKR 10,000-15,000/sem.',
+    admissionProcess: '1. Apply at muet.edu.pk/admissions. 2. Appear for MUET Entry Test. 3. Merit = FSc (60%) + Test (25%) + Matric (15%). 4. Sindh provincial merit list.',
+    scholarshipsOffered: 'MUET Merit Scholarship, Need-Based Aid, HEC Need-Based, Sindh CM Scholarship, Sindh Government Merit Scholarship.',
+    admissionDates: 'Admissions: June-August. MUET Test: August. Fall starts September. Single annual intake. Jamshoro, Sindh.',
+    examSystem: 'semester',
+  },
+  'uni-pk-014': { // PIEAS Islamabad
+    closingMerit: 'BS Electrical Eng: 88%, BS Mechanical: 85%, BS CS: 90%, BS Chemical: 82%, BS Nuclear Eng: 80%. Merit = FSc (40%) + PIEAS Test (45%) + Matric (15%).',
+    entryTestDetails: 'PIEAS Admission Test: 150 MCQs — Mathematics 50, Physics 40, Chemistry 30, English 15, Analytical 15. Duration: 3 hours. Very competitive.',
+    isOpenMerit: false,
+    supplyPolicy: 'Failed course: retake next semester. CGPA below 2.0: probation. Below 1.5 for 2 semesters: dismissed. Strict academic standards.',
+    feeRange: 'PKR 80,000-130,000 per semester. BS Engineering: ~PKR 110,000/sem. BS CS: ~PKR 120,000/sem. Government-funded.',
+    admissionProcess: '1. Apply at pieas.edu.pk/admissions. 2. Pay PKR 3,000 fee. 3. Appear for PIEAS Test. 4. Merit list. 5. Interview for shortlisted.',
+    scholarshipsOffered: 'PIEAS Merit Scholarship (full tuition for top performers), PAEC scholarships, Need-Based Aid, HEC Need-Based.',
+    admissionDates: 'Admissions: June-August. PIEAS Test: August. Fall starts September. Single annual intake. Federal government university.',
+    examSystem: 'semester',
+  },
+  'uni-pk-015': { // NCA Lahore
+    closingMerit: 'BFA (Fine Arts): 75%, BArch (Architecture): 80%, BDes (Design): 78%. Merit = FSc (30%) + NCA Test/Portfolio (50%) + Matric (20%).',
+    entryTestDetails: 'NCA Admission Test: Portfolio review + practical exam. Drawing, composition, color theory. Interview mandatory. Duration: 4 hours practical + 30 min interview.',
+    isOpenMerit: false,
+    supplyPolicy: 'Failed course: retake next semester. Portfolio-based evaluation. CGPA below 2.0: probation.',
+    feeRange: 'PKR 100,000-160,000 per semester. BFA: ~PKR 130,000/sem. BArch: ~PKR 140,000/sem.',
+    admissionProcess: '1. Apply at nca.edu.pk/admissions. 2. Pay PKR 3,000 fee. 3. Submit portfolio. 4. Appear for practical test. 5. Interview. 6. Merit list.',
+    scholarshipsOffered: 'NCA Merit Scholarship, Need-Based Aid, HEC Need-Based, Punjab provincial art scholarships.',
+    admissionDates: 'Admissions: May-July. Portfolio submission: June. Practical test: July. Fall starts August. Single annual intake.',
+    examSystem: 'semester',
+  },
+  'uni-pk-016': { // IBA Sukkur
+    closingMerit: 'BS CS: 78%, BBA: 80%, BS EE: 72%, BS Accounting: 75%. Merit = IBA Sukkur Test (40%) + FSc (35%) + Matric (25%).',
+    entryTestDetails: 'IBA Sukkur Test: 80 MCQs — Quantitative 30, Verbal 25, Analytical 15, Subject 10. Duration: 2 hours.',
+    isOpenMerit: true,
+    supplyPolicy: 'Failed course: retake next semester. CGPA below 2.0: probation. Maximum 3 semesters below 2.0: dismissed.',
+    feeRange: 'PKR 60,000-100,000 per semester. BS CS: ~PKR 85,000/sem. BBA: ~PKR 90,000/sem.',
+    admissionProcess: '1. Apply at ibasukkur.edu.pk/admissions. 2. Pay PKR 1,500 fee. 3. Appear for IBA Sukkur Test. 4. Merit list. 5. Submit documents.',
+    scholarshipsOffered: 'IBA Sukkur Merit Scholarship (50-100%), Need-Based Aid, HEC Need-Based, PEEF, Sukkur business community scholarships.',
+    admissionDates: 'Fall: July-September. Spring: January-March. Located in Sukkur, Sindh. Growing reputation in Sindh.',
+    examSystem: 'semester',
+  },
+  'uni-pk-017': { // University of Swat
+    closingMerit: 'BS CS: 72%, BBA: 70%, BS Botany: 65%, BS Zoology: 63%, BS Economics: 68%. Merit = FSc (50%) + Entry Test (30%) + Matric (20%).',
+    entryTestDetails: 'UoS Entry Test: 60 MCQs — subject-based 30, English 15, Analytical 10, GK 5. Duration: 1.5 hours.',
+    isOpenMerit: true,
+    supplyPolicy: 'Failed course: retake next semester. CGPA below 2.0: probation. Maximum 3 semesters below 2.0: expelled.',
+    feeRange: 'PKR 25,000-50,000 per semester (public sector). BS CS: ~PKR 40,000/sem.',
+    admissionProcess: '1. Apply at uos.edu.pk/admissions. 2. Pay PKR 1,000 fee. 3. Appear for entry test. 4. Merit list. 5. Submit documents.',
+    scholarshipsOffered: 'UoS Merit Scholarship, Need-Based Aid, HEC Need-Based, KPK provincial scholarships, PEEF.',
+    admissionDates: 'Fall: July-September. Spring: January-March. Located in Swat, KPK. Public sector university.',
+    examSystem: 'semester',
+  },
+  'uni-pk-018': { // PAF-KIET Karachi
+    closingMerit: 'BS CS: 78%, BS EE: 75%, BS SE: 76%, BBA: 73%, BS Aviation: 80%. Merit = FSc (50%) + PAF-KIET Test (30%) + Matric (20%).',
+    entryTestDetails: 'PAF-KIET Entry Test: 80 MCQs — Mathematics 25, Physics 20, English 15, Analytical 10, Aviation GK 10. Duration: 2 hours.',
+    isOpenMerit: true,
+    supplyPolicy: 'Failed course: retake next semester. CGPA below 2.0: probation. Maximum 3 semesters below 2.0: dismissed.',
+    feeRange: 'PKR 90,000-140,000 per semester. BS CS: ~PKR 120,000/sem. BS Aviation: ~PKR 135,000/sem.',
+    admissionProcess: '1. Apply at pafkiet.edu.pk/admissions. 2. Pay PKR 2,000 fee. 3. Appear for entry test. 4. Merit list. 5. Submit documents.',
+    scholarshipsOffered: 'PAF-KIET Merit Scholarship, PAF Scholarship (for PAF employees children), Need-Based Aid, HEC Need-Based.',
+    admissionDates: 'Fall: July-September. Spring: January-March. Located in Karachi. Known for aviation programs.',
+    examSystem: 'semester',
+  },
+  'uni-pk-019': { // CECOS University Peshawar
+    closingMerit: 'BS CS: 74%, BS EE: 70%, BS SE: 72%, BBA: 68%, BS Pharmacy: 72%. Merit = FSc (50%) + Entry Test (30%) + Matric (20%).',
+    entryTestDetails: 'CECOS Entry Test: 60 MCQs — subject-based 30, English 15, Analytical 10, GK 5. Duration: 1.5 hours.',
+    isOpenMerit: true,
+    supplyPolicy: 'Failed course: retake next semester. CGPA below 2.0: probation. Maximum 3 semesters below 2.0: expelled.',
+    feeRange: 'PKR 70,000-110,000 per semester. BS CS: ~PKR 95,000/sem. BS EE: ~PKR 85,000/sem.',
+    admissionProcess: '1. Apply at cecos.edu.pk/admissions. 2. Pay PKR 1,500 fee. 3. Appear for entry test. 4. Merit list. 5. Submit documents.',
+    scholarshipsOffered: 'CECOS Merit Scholarship (50-100%), Need-Based Aid, HEC Need-Based, KPK provincial scholarships, PEEF.',
+    admissionDates: 'Fall: July-September. Spring: January-March. Located in Peshawar, KPK. Private sector.',
+    examSystem: 'semester',
+  },
+  'uni-pk-020': { // HITEC University Taxila
+    closingMerit: 'BS CS: 76%, BS EE: 73%, BS ME: 71%, BS Civil: 70%, BS Aerospace: 78%. Merit = FSc (50%) + HITEC Test (30%) + Matric (20%).',
+    entryTestDetails: 'HITEC Entry Test: 80 MCQs — Mathematics 25, Physics 25, English 15, Analytical 15. Duration: 2 hours.',
+    isOpenMerit: true,
+    supplyPolicy: 'Failed course: retake next semester. CGPA below 2.0: probation. Maximum 3 semesters below 2.0: dismissed.',
+    feeRange: 'PKR 80,000-120,000 per semester. BS Engineering: ~PKR 100,000/sem. BS CS: ~PKR 105,000/sem.',
+    admissionProcess: '1. Apply at hitecuni.edu.pk/admissions. 2. Pay PKR 2,000 fee. 3. Appear for HITEC Test. 4. Merit list. 5. Submit documents.',
+    scholarshipsOffered: 'HITEC Merit Scholarship, Need-Based Aid, HEC Need-Based, PEEF, Pakistan Army scholarship (for army employees children).',
+    admissionDates: 'Fall: July-September. Spring: January-March. Located in Taxila. Known for aerospace and defense-related programs.',
+    examSystem: 'semester',
+  },
+  'uni-pk-021': { // Federal Urdu University
+    closingMerit: 'BS CS: 72%, BBA: 70%, BS English: 65%, BS Journalism: 68%, BS Education: 63%. Merit = FSc (50%) + Entry Test (30%) + Matric (20%).',
+    entryTestDetails: 'FWUU Entry Test: 60 MCQs — subject-based 25, English 15, Analytical 10, GK 10. Duration: 1.5 hours.',
+    isOpenMerit: true,
+    supplyPolicy: 'Failed course: retake next semester. CGPA below 2.0: probation. Maximum 3 semesters below 2.0: expelled.',
+    feeRange: 'PKR 20,000-40,000 per semester (public sector). BS CS: ~PKR 35,000/sem. BBA: ~PKR 30,000/sem.',
+    admissionProcess: '1. Apply at fwuu.edu.pk/admissions. 2. Pay PKR 1,000 fee. 3. Appear for entry test. 4. Merit list. 5. Submit documents.',
+    scholarshipsOffered: 'FWUU Merit Scholarship, Need-Based Aid, HEC Need-Based, Bait-ul-Maal, Federal employee scholarships.',
+    admissionDates: 'Fall: July-September. Spring: January-March. Campuses: Karachi (main), Islamabad. Public sector.',
+    examSystem: 'semester',
   },
 };
 
 async function main() {
-  console.log('=== Seeding University AI Knowledge Fields ===\n');
+  console.log('=== Seeding University AI Knowledge Fields (9 fields each) ===\n');
 
   let updated = 0;
+  let notFound = 0;
   for (const [uniId, data] of Object.entries(uniKnowledge)) {
     const uni = await p.university.findUnique({ where: { id: uniId } });
     if (!uni) {
       console.log(`  ⚠️  NOT FOUND: ${uniId}`);
+      notFound++;
       continue;
     }
     await p.university.update({
@@ -158,13 +391,14 @@ async function main() {
     updated++;
   }
 
-  // Clear wrong data from international universities that were incorrectly matched
-  const wrongIds = [
-    'uni-intl-001', // might have wrong data
-  ];
-
   const totalWithData = await p.university.count({ where: { closingMerit: { not: null } } });
-  console.log(`\n=== DONE: ${updated} universities updated, ${totalWithData} total with knowledge fields ===`);
+  const totalWithDates = await p.university.count({ where: { admissionDates: { not: null } } });
+  const totalWithExamSys = await p.university.count({ where: { examSystem: { not: null } } });
+  console.log(`\n=== DONE ===`);
+  console.log(`Updated: ${updated} universities (not found: ${notFound})`);
+  console.log(`Total with closingMerit: ${totalWithData}`);
+  console.log(`Total with admissionDates: ${totalWithDates}`);
+  console.log(`Total with examSystem: ${totalWithExamSys}`);
 
   await p.$disconnect();
 }

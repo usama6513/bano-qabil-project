@@ -14,6 +14,8 @@ const colleges = [
     supplyPolicy: 'Annual exam system (BISE Lahore). Failed subjects: supplementary exam within 6 months. If failed again: repeat year. Maximum 3 chances per subject. Punjab College also offers internal retests for practice.',
     admissionProcess: '1. Visit nearest campus. 2. Submit Matric result card + CNIC/B-Form. 3. Pay admission fee PKR 5,000. 4. Choose program (FSc Pre-Med/Pre-Eng/ICS/ICOM/FA). 5. Attend orientation. Admissions open June-October.',
     scholarshipsOffered: 'Merit Scholarship: 85%+ Matric = 50% fee waiver, 90%+ = 75% waiver, 95%+ = 100% free. Need-based aid available for deserving students. Special discount for siblings.',
+    admissionDates: 'Admissions open: June-October every year. Multiple campuses across Lahore. Walk-in admissions available.',
+    examSystem: 'yearly',
   },
   {
     name: 'Government College Lahore',
@@ -26,6 +28,8 @@ const colleges = [
     supplyPolicy: 'Annual exam system (BISE Lahore). Failed subjects: supplementary within 6 months. If failed again: repeat year. Maximum 3 chances. Government college — strict attendance required (75% minimum).',
     admissionProcess: '1. Apply online at gc.edu.pk or visit campus. 2. Submit Matric result + CNIC. 3. Pay PKR 1,000 application fee. 4. Merit list announced. 5. If selected, pay fee and submit documents.',
     scholarshipsOffered: 'Government Merit Scholarship (free education for top 5%), Need-Based Financial Aid (full fee waiver for low-income), HEC Need-Based applicable, Punjab Honhaar Scholarship, Bait-ul-Maal.',
+    admissionDates: 'Admissions open: June-August every year. Merit lists announced July-September. Walk-in during admission window.',
+    examSystem: 'yearly',
   },
   {
     name: 'Forman Christian College (A Chartered University)',
@@ -38,6 +42,8 @@ const colleges = [
     supplyPolicy: 'Annual exam system (BISE Lahore). Failed subjects: supplementary within 6 months. If failed again: repeat year. Maximum 3 chances. Attendance 75% required.',
     admissionProcess: '1. Apply at fccollege.edu.pk/admissions. 2. Pay PKR 2,000 fee. 3. Submit Matric result + CNIC. 4. Appear for entrance test (if applicable). 5. Merit list. 6. Interview for some programs.',
     scholarshipsOffered: 'FC Merit Scholarship (50-100% for CGPA 3.5+ at intermediate), Need-Based Financial Aid, Minority community scholarships, HEC Need-Based, Punjab provincial scholarships.',
+    admissionDates: 'Admissions open: May-August every year. Entry test (if applicable) in June. Fall starts September.',
+    examSystem: 'yearly',
   },
   {
     name: 'KIPS College Lahore',
@@ -50,6 +56,8 @@ const colleges = [
     supplyPolicy: 'Annual exam system (BISE Lahore). Failed subjects: supplementary within 6 months. KIPS also offers extra classes and retests for practice. Maximum 3 board attempts.',
     admissionProcess: '1. Visit nearest KIPS campus. 2. Submit Matric result + CNIC. 3. Pay admission fee. 4. Choose program. 5. Attend orientation. Admissions open May-September.',
     scholarshipsOffered: 'KIPS Merit Scholarship: 90%+ Matric = 50% waiver, 95%+ = 100% free. Need-based aid for deserving students. Sibling discount 10%.',
+    admissionDates: 'Admissions open: May-September every year. Scholarship test held separately in June. Multiple campuses in Lahore.',
+    examSystem: 'yearly',
   },
   // ===== SINDH =====
   {
@@ -63,6 +71,8 @@ const colleges = [
     supplyPolicy: 'Annual exam system (BISE Karachi). Failed subjects: supplementary within 6 months. If failed again: repeat year. Maximum 3 chances. Strict attendance 75% required.',
     admissionProcess: '1. Apply online at djs.edu.pk or visit campus. 2. Submit Matric result + domicile (Sindh required) + CNIC. 3. Pay PKR 1,000 fee. 4. Merit list announced. 5. Submit documents if selected.',
     scholarshipsOffered: 'Government Merit Scholarship (free for top 5%), Sindh CM Scholarship, Sindh Government Merit Scholarship, HEC Need-Based, Bait-ul-Maal.',
+    admissionDates: 'Admissions open: June-August every year. Merit list announced July-September. Sindh domicile required.',
+    examSystem: 'yearly',
   },
   {
     name: 'St. Joseph College Karachi',
@@ -75,6 +85,8 @@ const colleges = [
     supplyPolicy: 'Annual exam system (BISE Karachi). Failed subjects: supplementary within 6 months. Maximum 3 chances. Strict discipline and attendance required.',
     admissionProcess: '1. Visit campus or apply online. 2. Submit Matric result + CNIC/B-Form. 3. Pay admission fee. 4. Merit list. 5. Interview (if required).',
     scholarshipsOffered: 'Minority community scholarships, Church-based financial aid, Merit Scholarship for 90%+ students, Need-Based Aid for deserving students.',
+    admissionDates: 'Admissions open: June-August every year. Merit list announced July-September. Karachi.',
+    examSystem: 'yearly',
   },
   // ===== KPK =====
   {
@@ -88,6 +100,8 @@ const colleges = [
     supplyPolicy: 'Annual exam system (BISE Peshawar). Failed subjects: supplementary within 6 months. Maximum 3 chances. Attendance 75% required.',
     admissionProcess: '1. Apply at edwardes.edu.pk or visit campus. 2. Submit Matric result + domicile (KPK) + CNIC. 3. Pay PKR 500 fee. 4. Merit list announced.',
     scholarshipsOffered: 'Government Merit Scholarship, KPK Education Scholarship, HEC Need-Based, Bait-ul-Maal, Provincial need-based aid.',
+    admissionDates: 'Admissions open: June-August every year. KPK domicile required. Peshawar.',
+    examSystem: 'yearly',
   },
   // ===== ISLAMABAD =====
   {
@@ -101,6 +115,8 @@ const colleges = [
     supplyPolicy: 'Annual exam system (BISE Rawalpindi). Failed subjects: supplementary within 6 months. Maximum 3 chances. Attendance 75% required.',
     admissionProcess: '1. Visit campus. 2. Submit Matric result + domicile + CNIC. 3. Pay PKR 1,000 fee. 4. Merit list. 5. Submit documents.',
     scholarshipsOffered: 'Government Merit Scholarship (free for top 5%), Need-Based Financial Aid, HEC Need-Based, PEEF for Punjab students, Bait-ul-Maal.',
+    admissionDates: 'Admissions open: June-August every year. Merit lists July-September. Rawalpindi.',
+    examSystem: 'yearly',
   },
   {
     name: 'F.G. Sir Syed College Islamabad',
@@ -113,6 +129,8 @@ const colleges = [
     supplyPolicy: 'Annual exam system (FBISE). Failed subjects: supplementary within 6 months. Maximum 3 chances. Attendance 75% required.',
     admissionProcess: '1. Apply online at fgcr.edu.pk or visit campus. 2. Submit Matric result + CNIC. 3. Pay PKR 500 fee. 4. Merit list. 5. Submit documents.',
     scholarshipsOffered: 'Federal Government Merit Scholarship, Need-Based Aid, HEC Need-Based, Bait-ul-Maal, Federal employee children discount.',
+    admissionDates: 'Admissions open: June-August every year. Priority for federal government employees children. Islamabad.',
+    examSystem: 'yearly',
   },
   {
     name: 'Beaconhouse College Program (BCP)',
@@ -125,6 +143,8 @@ const colleges = [
     supplyPolicy: 'A-Levels: Cambridge system — retake individual papers. FSc: Annual system (BISE) — supplementary within 6 months. Maximum 3 chances.',
     admissionProcess: '1. Apply at bcp.edu.pk. 2. Pay PKR 5,000 application fee. 3. Appear for entry test. 4. Interview with student + parents. 5. Offer letter. 6. Pay admission fee.',
     scholarshipsOffered: 'BCP Merit Scholarship (25-50% for exceptional O-Level/Matric results), Beaconhouse staff children discount (50%), Need-Based Aid (limited).',
+    admissionDates: 'A-Levels admissions: March-June. FSc admissions: May-August. Entry test and interview required. Lahore.',
+    examSystem: 'mixed',
   },
 ];
 
@@ -153,6 +173,8 @@ async function main() {
           supplyPolicy: c.supplyPolicy,
           admissionProcess: c.admissionProcess,
           scholarshipsOffered: c.scholarshipsOffered,
+          admissionDates: c.admissionDates,
+          examSystem: c.examSystem,
         },
       });
       console.log(`  🔄 Updated: ${c.name}`);
@@ -173,6 +195,8 @@ async function main() {
           supplyPolicy: c.supplyPolicy,
           admissionProcess: c.admissionProcess,
           scholarshipsOffered: c.scholarshipsOffered,
+          admissionDates: c.admissionDates,
+          examSystem: c.examSystem,
         },
       });
       console.log(`  ✅ Created: ${c.name}`);
