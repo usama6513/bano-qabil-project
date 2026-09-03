@@ -83,26 +83,22 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return errorResponse('User ID is required', 'VALIDATION_ERROR', 400);
     }
 
-    let body: Record<string, unknown>;
-    try {
-      body = await request.json();
-    } catch {
-      return errorResponse('Invalid JSON body', 'VALIDATION_ERROR', 400);
-    }
-
-    if (typeof body !== 'object' || body === null || Array.isArray(body)) {
-      return errorResponse('Request body must be a JSON object', 'VALIDATION_ERROR', 400);
-    }
-
-    const reason = body.reason;
-    if (typeof reason !== 'string' || reason.trim().length === 0) {
-      return errorResponse('reason is required and must be a non-empty string', 'VALIDATION_ERROR', 400);
-    }
     if (auth.user.userId === id) {
       return errorResponse('You cannot delete your own account', 'VALIDATION_ERROR', 400);
     }
 
-    await admin.deleteUser(id, reason.trim());
+    // Try to read reason from body (may fail on some serverless environments for DELETE)
+    let reason = 'Admin deletion';
+    try {
+      const body = await request.json();
+      if (body && typeof body === 'object' && typeof body.reason === 'string' && body.reason.trim()) {
+        reason = body.reason.trim();
+      }
+    } catch {
+      // Body not available (common with DELETE on serverless) — use default reason
+    }
+
+    await admin.deleteUser(id, reason);
     return successResponse({ message: 'User deleted successfully' });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';

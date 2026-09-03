@@ -592,7 +592,7 @@ export class SystemAdminService {
       }),
     ]);
 
-    await Promise.all([
+    await Promise.allSettled([
       this.writeDataChangeLog({
         action: 'DELETE',
         entityType: 'user',
