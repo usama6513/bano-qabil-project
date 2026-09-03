@@ -31,6 +31,7 @@ interface OverviewData {
   system: {
     uptimeMs: number;
     nodeEnv: string;
+    dbEngine: { name: string; description: string };
     dbSize: string;
     memoryUsageMB: number;
   };
@@ -128,7 +129,9 @@ export default function AdminHealthPage() {
   }
 
   const mem = perf.memoryUsage;
-  const memPercent = mem.heapTotalMB > 0 ? (mem.heapUsedMB / mem.heapTotalMB) * 100 : 0;
+  // On serverless (Vercel), heap is misleading — use RSS for real memory pressure
+  const SERVERLESS_MEM_LIMIT_MB = 1024;
+  const memPercent = mem.rssMB > 0 ? Math.min((mem.rssMB / SERVERLESS_MEM_LIMIT_MB) * 100, 100) : 0;
   const status = getHealthStatus(perf.errorRate, memPercent);
   const statusStyle = STATUS_STYLES[status];
   const nodeEnv = overview.system.nodeEnv.toLowerCase();
@@ -183,18 +186,19 @@ export default function AdminHealthPage() {
           <div className="p-6 space-y-4">
             <div>
               <div className="flex items-baseline justify-between mb-1.5">
-                <span className="text-sm bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">Heap</span>
-                <span className="text-sm font-semibold gradient-text tabular-nums">{mem.heapUsedMB} MB / {mem.heapTotalMB} MB</span>
+                <span className="text-sm bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">Heap (V8)</span>
+                <span className="text-sm font-semibold gradient-text tabular-nums">{mem.heapUsedMB.toFixed(1)} MB / {mem.heapTotalMB.toFixed(1)} MB</span>
               </div>
-              <ProgressBar percent={memPercent} barColor={memPercent > 90 ? "bg-gradient-to-r from-red-500 to-pink-500" : memPercent > 75 ? "bg-gradient-to-r from-amber-500 to-orange-500" : "bg-gradient-to-r from-emerald-500 to-teal-500"} height="h-3.5" />
+              <ProgressBar percent={mem.heapTotalMB > 0 ? (mem.heapUsedMB / mem.heapTotalMB) * 100 : 0} barColor="bg-gradient-to-r from-blue-500 to-indigo-500" height="h-2" />
+              <p className="mt-1 text-xs text-cyan-400">V8 managed heap — auto-reclaimed by garbage collector</p>
             </div>
             <div>
               <div className="flex items-baseline justify-between mb-1.5">
-                <span className="text-sm bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">RSS (process)</span>
-                <span className="text-sm font-semibold gradient-text tabular-nums">{mem.rssMB} MB</span>
+                <span className="text-sm bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent">RSS (total process)</span>
+                <span className={`text-sm font-semibold tabular-nums ${memPercent > 90 ? 'text-red-400' : memPercent > 75 ? 'text-amber-400' : 'gradient-text'}`}>{mem.rssMB.toFixed(1)} MB / {SERVERLESS_MEM_LIMIT_MB} MB</span>
               </div>
-              <ProgressBar percent={overview.system.memoryUsageMB > 0 ? (mem.rssMB / overview.system.memoryUsageMB) * 100 : 0} barColor="bg-gradient-to-r from-violet-500 to-purple-500" height="h-1.5" />
-              <p className="mt-1 text-xs text-cyan-400">Reported by overview: {overview.system.memoryUsageMB} MB RSS</p>
+              <ProgressBar percent={memPercent} barColor={memPercent > 90 ? "bg-gradient-to-r from-red-500 to-pink-500" : memPercent > 75 ? "bg-gradient-to-r from-amber-500 to-orange-500" : "bg-gradient-to-r from-emerald-500 to-teal-500"} height="h-3.5" />
+              <p className="mt-1 text-xs text-cyan-400">Actual memory usage ({memPercent.toFixed(1)}% of {SERVERLESS_MEM_LIMIT_MB} MB serverless limit)</p>
             </div>
           </div>
         </div>
@@ -260,8 +264,8 @@ export default function AdminHealthPage() {
               <div className="rounded-xl p-4 relative overflow-hidden" style={{ background: 'rgba(11, 17, 32, 0.5)', border: '1px solid rgba(148, 163, 184, 0.1)' }}>
                 <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 to-cyan-500" />
                 <p className="text-xs bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent uppercase tracking-wide">Engine</p>
-                <p className="mt-1 text-lg font-semibold gradient-text">SQLite</p>
-                <p className="text-xs text-cyan-400">local file database</p>
+                <p className="mt-1 text-lg font-semibold gradient-text">{overview.system.dbEngine?.name || 'PostgreSQL'}</p>
+                <p className="text-xs text-cyan-400">{overview.system.dbEngine?.description || 'relational database'}</p>
               </div>
               <div className="rounded-xl p-4 relative overflow-hidden" style={{ background: 'rgba(11, 17, 32, 0.5)', border: '1px solid rgba(148, 163, 184, 0.1)' }}>
                 <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-violet-500 to-purple-500" />

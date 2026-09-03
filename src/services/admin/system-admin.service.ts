@@ -166,8 +166,27 @@ export class SystemAdminService {
     return map;
   }
 
+  private getDbEngine(): { name: string; description: string } {
+    const url = process.env.DATABASE_URL || '';
+    if (url.startsWith('postgres://') || url.startsWith('postgresql://')) {
+      const isNeon = url.includes('neon.tech') || url.includes('neon.tech/');
+      return { name: isNeon ? 'PostgreSQL (Neon)' : 'PostgreSQL', description: isNeon ? 'serverless cloud database' : 'relational database' };
+    }
+    if (url.startsWith('mysql://')) return { name: 'MySQL', description: 'relational database' };
+    if (url.startsWith('file:') || url.includes('.db')) return { name: 'SQLite', description: 'local file database' };
+    return { name: 'PostgreSQL', description: 'relational database' };
+  }
+
   private async getDbSize(): Promise<string> {
+    const engine = this.getDbEngine();
     try {
+      if (engine.name.includes('PostgreSQL')) {
+        const rows = await prisma.$queryRaw<Array<{ size: number | bigint }>>`
+          SELECT pg_database_size(current_database()) AS size
+        `;
+        return formatBytes(Number(rows[0]?.size ?? 0));
+      }
+      // SQLite fallback
       const rows = await prisma.$queryRaw<Array<{ size: number | bigint }>>`
         SELECT (SELECT page_count FROM pragma_page_count) * (SELECT page_size FROM pragma_page_size) AS size
       `;
@@ -290,6 +309,7 @@ export class SystemAdminService {
       system: {
         uptimeMs: Math.round(process.uptime() * 1000),
         nodeEnv: process.env.NODE_ENV || 'development',
+        dbEngine: this.getDbEngine(),
         dbSize,
         memoryUsageMB: roundTo(memory.rss / 1024 / 1024),
       },
