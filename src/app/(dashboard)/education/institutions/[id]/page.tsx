@@ -39,6 +39,8 @@ interface Institution {
   website: string;
   location: string;
   province: string;
+  campuses: string | null;
+  totalCampuses: number | null;
   contactEmail: string;
   contactPhone: string;
   eligibilityCriteria: string;
@@ -120,12 +122,73 @@ export default function InstitutionDetailPage() {
           {institution.province === 'all' && (
             <span className="text-xs bg-green-500/10 text-green-400 px-3 py-1 rounded-full">All Pakistan</span>
           )}
+          {institution.totalCampuses && institution.totalCampuses > 1 && (
+            <span className="text-xs bg-amber-500/10 text-amber-400 px-3 py-1 rounded-full">📍 {institution.totalCampuses} campuses</span>
+          )}
         </div>
 
         <div className="mt-6">
           <h2 className="font-semibold text-gray-100 mb-2">About This Institution</h2>
           <p className="text-gray-300 leading-relaxed">{institution.description}</p>
         </div>
+
+        {institution.campuses && (() => {
+          try {
+            const campusData = JSON.parse(institution.campuses);
+            return (
+              <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
+                <h3 className="text-sm font-semibold text-amber-400 mb-2">📍 Campus Network</h3>
+                {campusData.summary && <p className="text-xs text-gray-400 mb-2">{campusData.summary}</p>}
+                {campusData.byProvince && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {Object.entries(campusData.byProvince).map(([prov, count]) => (
+                      <span key={prov} className="text-xs bg-white/5 text-gray-300 px-2 py-0.5 rounded-full">{prov}: {String(count)}</span>
+                    ))}
+                  </div>
+                )}
+                {campusData.majorCities && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {campusData.majorCities.slice(0, 10).map((city: string, i: number) => (
+                      <span key={i} className="text-xs bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full">{city}</span>
+                    ))}
+                    {campusData.majorCities.length > 10 && (
+                      <span className="text-xs text-gray-500">+{campusData.majorCities.length - 10} more</span>
+                    )}
+                  </div>
+                )}
+                {campusData.karachiCampuses && (
+                  <details className="mt-2">
+                    <summary className="text-xs text-cyan-400 cursor-pointer hover:text-cyan-300">View {campusData.karachiCampuses.length} Karachi campuses</summary>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {campusData.karachiCampuses.map((c: string, i: number) => (
+                        <span key={i} className="text-xs bg-white/5 text-gray-400 px-2 py-0.5 rounded-full">{c}</span>
+                      ))}
+                    </div>
+                  </details>
+                )}
+                {campusData.majorCenters && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {campusData.majorCenters.slice(0, 12).map((c: string, i: number) => (
+                      <span key={i} className="text-xs bg-white/5 text-gray-400 px-2 py-0.5 rounded-full">{c}</span>
+                    ))}
+                  </div>
+                )}
+                {campusData.programs && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {campusData.programs.map((p: string, i: number) => (
+                      <span key={i} className="text-xs bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded-full">{p}</span>
+                    ))}
+                  </div>
+                )}
+                {campusData.platform && (
+                  <p className="text-xs text-cyan-400 mt-2">Platform: {campusData.platform}</p>
+                )}
+              </div>
+            );
+          } catch {
+            return null;
+          }
+        })()}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
           {institution.contactEmail && (

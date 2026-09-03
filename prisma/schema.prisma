@@ -1859,6 +1859,8 @@ model FreeInstitution {
   website               String?
   location              String?
   province              String?
+  campuses              String?            // JSON or text listing all campuses/centers
+  totalCampuses         Int?               @map("total_campuses")
   contactEmail          String?            @map("contact_email")
   contactPhone          String?            @map("contact_phone")
   eligibilityCriteria   String?            @map("eligibility_criteria")

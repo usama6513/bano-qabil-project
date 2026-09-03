@@ -26,6 +26,7 @@ interface Institution {
   description: string;
   location: string;
   province: string;
+  totalCampuses: number | null;
   verificationStatus: string;
   courses: InstitutionCourse[];
   entryTests: InstitutionEntryTest[];
@@ -172,6 +173,9 @@ export default function InstitutionsPage() {
                   )}
                   {inst.province === 'all' && (
                     <span className="text-xs bg-green-500/10 text-green-400 px-2 py-0.5 rounded-full">All Pakistan</span>
+                  )}
+                  {inst.totalCampuses && inst.totalCampuses > 1 && (
+                    <span className="text-xs bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-full">📍 {inst.totalCampuses} campuses</span>
                   )}
                 </div>
                 {inst.courses.length > 0 && (
