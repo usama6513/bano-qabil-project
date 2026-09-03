@@ -16,12 +16,12 @@ export class EmailVerificationService {
     name: string;
     country?: string;
     preferredLanguage?: string;
-  }): Promise<{ userId: string; requiresVerification: boolean }> {
+  }): Promise<{ userId: string; requiresVerification: boolean; code: string; emailSent: boolean }> {
     const email = data.email.toLowerCase().trim();
 
     // Admin emails bypass verification
     if (isAdminEmail(email)) {
-      return { userId: '', requiresVerification: false };
+      return { userId: '', requiresVerification: false, code: '', emailSent: false };
     }
 
     // Check if user already exists
@@ -83,7 +83,7 @@ export class EmailVerificationService {
       // Don't throw — the code is stored, user can request resend
     }
 
-    return { userId: user.id, requiresVerification: true };
+    return { userId: user.id, requiresVerification: true, code, emailSent: emailResult.success && !emailResult.previewUrl };
   }
 
   /**

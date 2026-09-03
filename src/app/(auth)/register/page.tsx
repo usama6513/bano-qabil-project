@@ -31,6 +31,7 @@ export default function RegisterPage() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [resendMessage, setResendMessage] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [devCode, setDevCode] = useState(''); // Shown when SMTP isn't configured
   const codeInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const { register, loginWithTokens } = useAuth();
@@ -77,6 +78,7 @@ export default function RegisterPage() {
           userId?: string;
           email?: string;
           message?: string;
+          devCode?: string;
         };
       }>('/api/auth/send-verification', {
         name: formData.name,
@@ -102,6 +104,10 @@ export default function RegisterPage() {
 
       // Move to verification step
       setVerificationEmail(formData.email);
+      // If email service isn't configured, show the code directly for testing
+      if (response.data.devCode) {
+        setDevCode(String(response.data.devCode));
+      }
       setStep('verify');
       setResendCooldown(60);
       // Focus first code input
@@ -226,6 +232,14 @@ export default function RegisterPage() {
         {resendMessage && (
           <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-green-400 text-sm text-center">
             {resendMessage}
+          </div>
+        )}
+
+        {devCode && (
+          <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg text-center">
+            <p className="text-amber-400 text-xs mb-2">Email service not configured. Your verification code:</p>
+            <p className="text-3xl font-bold tracking-widest text-amber-300 font-mono">{devCode}</p>
+            <p className="text-amber-500 text-xs mt-2">Enter this code below to verify your account</p>
           </div>
         )}
 

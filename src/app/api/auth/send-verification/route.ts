@@ -43,12 +43,22 @@ export async function POST(request: NextRequest) {
     // Send verification code (creates user as inactive)
     const result = await emailVerificationService.sendVerificationCode(validation.data);
 
-    return successResponse({
+    // If email was actually sent (real SMTP configured), don't expose the code
+    // If email wasn't sent (no SMTP / Ethereal fallback), include code for testing
+    const response: Record<string, unknown> = {
       requiresVerification: true,
       userId: result.userId,
       email: validation.data.email,
-      message: 'A verification code has been sent to your email. Please check your inbox.',
-    }, 201);
+      message: result.emailSent
+        ? 'A verification code has been sent to your email. Please check your inbox.'
+        : 'Email service not configured. Use the code below to verify your account.',
+    };
+
+    if (!result.emailSent) {
+      response.devCode = result.code; // Only expose when real email isn't sent
+    }
+
+    return successResponse(response, 201);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to send verification code';
     return errorResponse(message, 'SEND_VERIFICATION_FAILED', 400);
