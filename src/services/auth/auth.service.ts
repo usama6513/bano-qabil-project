@@ -100,10 +100,6 @@ export class AuthService {
 
     // Check if account is active
     if (!user.isActive) {
-      // Check if the user hasn't verified their email yet
-      if (!user.emailVerified) {
-        throw new Error('Please verify your email address first. Check your inbox for the verification code.');
-      }
       throw new Error('Account is disabled. Please contact support.');
     }
 

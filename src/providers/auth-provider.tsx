@@ -29,7 +29,6 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (data: { name: string; email: string; password: string; confirmPassword: string; country?: string; preferredLanguage?: string }) => Promise<void>;
-  loginWithTokens: (user: User, tokens: { accessToken: string; refreshToken: string }) => void;
   logout: () => Promise<void>;
   updateUser: (user: User) => void;
   refreshUser: () => Promise<void>;
@@ -85,11 +84,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData);
   };
 
-  const loginWithTokens = (userData: User, tokens: { accessToken: string; refreshToken: string }) => {
-    apiClient.setTokens(tokens.accessToken, tokens.refreshToken);
-    setUser(userData);
-  };
-
   const logout = async () => {
     try {
       const refreshToken = localStorage.getItem('refreshToken');
@@ -107,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, isAuthenticated: !!user, login, register, loginWithTokens, logout, updateUser, refreshUser }}>
+    <AuthContext.Provider value={{ user, isLoading, isAuthenticated: !!user, login, register, logout, updateUser, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
