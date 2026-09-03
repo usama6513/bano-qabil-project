@@ -91,7 +91,10 @@ const ACTION_BADGES: Record<string, string> = {
 const EMPTY_FILTERS: AppliedFilters = { action: "", entityType: "", userId: "", dateFrom: "", dateTo: "" };
 
 const inputClass =
-  "rounded-lg border border-white/10 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent";
+  "rounded-lg border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent";
+
+const selectClass =
+  "rounded-lg border border-white/10 bg-slate-900/60 px-3 py-2 pr-8 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:16px] bg-[right_8px_center] bg-no-repeat";
 
 function relativeTime(ts: string): string {
   const diffMs = Date.now() - new Date(ts).getTime();
@@ -360,7 +363,7 @@ export default function AdminAuditPage() {
           <select
             value={draft.action}
             onChange={e => setDraft(prev => ({ ...prev, action: e.target.value }))}
-            className={inputClass}
+            className={selectClass}
           >
             {ACTION_OPTIONS.map(option => (
               <option key={option.value} value={option.value}>
@@ -371,7 +374,7 @@ export default function AdminAuditPage() {
           <select
             value={draft.entityType}
             onChange={e => setDraft(prev => ({ ...prev, entityType: e.target.value }))}
-            className={inputClass}
+            className={selectClass}
           >
             {ENTITY_TYPE_OPTIONS.map(option => (
               <option key={option.value} value={option.value}>
