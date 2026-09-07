@@ -1,0 +1,13 @@
+{
+  "_comment": "Unlimited Truecaller API keys — add as many as you want per tier. Keys from all sources (env vars + this file) are merged automatically.",
+  "_usage": {
+    "primary": "Keys for truecaller-api13 endpoint (POST). Add unlimited RapidAPI keys here.",
+    "backup": "Keys for truecaller-data2 endpoint (GET). Separate rate limits from primary.",
+    "tertiary": "Last-resort keys. Tried after primary + backup are exhausted.",
+    "keys": "Generic pool — treated as primary keys."
+  },
+  "primary": [],
+  "backup": [],
+  "tertiary": [],
+  "keys": []
+}

@@ -164,7 +164,7 @@ export default function ChatSidebar({
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
               placeholder="Search chats..."
-              className="w-full pl-8 pr-3 py-1.5 text-sm bg-[#0f172a] border border-[#1e293b] rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-transparent outline-none"
+              className="w-full pl-8 pr-3 py-1.5 text-sm text-white bg-[#0f172a] border border-[#1e293b] rounded-lg placeholder:text-slate-500 focus:ring-1 focus:ring-blue-500 focus:border-transparent outline-none"
               aria-label="Search conversations"
             />
           </div>
@@ -220,7 +220,7 @@ export default function ChatSidebar({
                               if (e.key === 'Enter') handleRenameSubmit(conv.id);
                               if (e.key === 'Escape') setEditingId(null);
                             }}
-                            className="flex-1 text-sm bg-[#0f172a] border border-blue-300 rounded px-1 py-0.5 outline-none"
+                            className="flex-1 text-sm text-white bg-[#0f172a] border border-blue-300 rounded px-1 py-0.5 outline-none placeholder:text-slate-500"
                             autoFocus
                             onClick={(e) => e.stopPropagation()}
                             aria-label="Rename conversation"

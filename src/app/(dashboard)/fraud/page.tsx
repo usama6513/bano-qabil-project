@@ -14,6 +14,7 @@ const tools = [
   { title: 'Previous Checks', description: <>View your <span className="text-teal-400">scan history</span> and past fraud detection results</>, href: '/fraud/history', icon: '📋', query: '' },
   { title: 'Report & Authorities', description: <>Find <span className="text-rose-400">cybercrime authorities</span> and guidance on reporting fraud</>, href: '/fraud/reporting', icon: '🏛️', query: '' },
   { title: 'Scam Trends', description: <>View current <span className="text-yellow-400">scam trends</span>, statistics, and prevention tips</>, href: '/fraud/trends', icon: '📊', query: '' },
+  { title: 'All Scam Types', description: <>Browse <span className="text-cyan-400">all 44 scam types</span> — check what evidence & documents are needed</>, href: '/fraud/scam-types', icon: '📚', query: '' },
 ];
 
 const cardColors = [

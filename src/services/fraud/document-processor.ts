@@ -52,26 +52,24 @@ export class DocumentProcessor {
     if (mimeType === 'application/pdf') {
       const buffer = file instanceof Buffer ? file : Buffer.from(await (file as File).arrayBuffer());
       try {
-        const { execFile } = await import('child_process');
-        const { writeFile, unlink } = await import('fs/promises');
-        const { join, resolve } = await import('path');
-        const { tmpdir } = await import('os');
-        const tmpFile = join(tmpdir(), `pdf-${Date.now()}-${Math.random().toString(36).slice(2)}.pdf`);
-        await writeFile(tmpFile, buffer);
-        const scriptPath = resolve(process.cwd(), 'scripts', 'parse-pdf.js');
+        console.log('[PDF] Starting PDF parse with pdf2json, buffer size:', buffer.length);
+        const PDFParser = await import('pdf2json');
+        const pdfParser = new PDFParser.default();
+        
         const text = await new Promise<string>((resolve, reject) => {
-          execFile('node', [scriptPath, tmpFile], { timeout: 30000 }, (err, stdout, stderr) => {
-            try { unlink(tmpFile); } catch { /* cleanup */ }
-            if (err) {
-              console.error('PDF exec error:', err.message, stderr);
-              return reject(err);
-            }
-            try {
-              const parsed = JSON.parse(stdout);
-              resolve(parsed.success ? parsed.text : '');
-            } catch { resolve(''); }
+          pdfParser.on('pdfParser_dataReady', (pdfData: any) => {
+            const extractedText = pdfData.Pages
+              .map((p: any) => p.Texts.map((t: any) => decodeURIComponent(t.R.map((r: any) => r.T).join(''))).join(' '))
+              .join('\n');
+            resolve(extractedText);
           });
+          pdfParser.on('pdfParser_dataError', (err: any) => {
+            reject(new Error(err.parserError || 'PDF parsing failed'));
+          });
+          pdfParser.parseBuffer(buffer);
         });
+        
+        console.log('[PDF] Parse result, text length:', text.length);
         return {
           filename,
           fileType: mimeType,
@@ -81,14 +79,16 @@ export class DocumentProcessor {
         };
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
-        console.error('PDF parse error:', msg);
+        const stack = e instanceof Error ? e.stack : '';
+        console.error('[PDF] Parse error:', msg);
+        console.error('[PDF] Stack:', stack);
         return {
           filename,
           fileType: mimeType,
           text: '',
           urls: [],
-          indicators: ['PDF text extraction failed'],
-          error: 'PDF text extraction unavailable',
+          indicators: ['PDF text extraction failed: ' + msg],
+          error: 'PDF text extraction unavailable: ' + msg,
         };
       }
     }

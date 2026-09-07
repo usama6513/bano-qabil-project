@@ -108,6 +108,17 @@
     background: rgba(11, 17, 32, 0.95);
   }
 
+  /* Fix select option visibility: dark bg for dropdown options so light text is readable */
+  select option {
+    background: #0f172a;
+    color: #e2e8f0;
+  }
+  select.input-field option,
+  select[class*="bg-slate"] option {
+    background: #0f172a;
+    color: #e2e8f0;
+  }
+
   /* Multi-colored input variants */
   .input-cyan:focus { border-color: #06b6d4; box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.15), 0 4px 20px rgba(6, 182, 212, 0.08); }
   .input-emerald:focus { border-color: #10b981; box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15), 0 4px 20px rgba(16, 185, 129, 0.08); }

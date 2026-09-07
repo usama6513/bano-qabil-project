@@ -3,10 +3,11 @@ import { UrlAnalyzer } from './url-analyzer';
 import { TextAnalyzer } from './text-analyzer';
 import { DocumentProcessor } from './document-processor';
 import { RiskScorer } from './risk-scorer';
-import { AiExplainer } from './ai-explainer';
 import { redactSensitiveData } from '@/lib/credential-redaction';
+import type { AiExplanation } from './ai-explainer';
 import { validateFile } from '@/lib/file-validation';
 import { isSafeUrl } from '@/lib/ssrf-protection';
+import { getComplaintPathForType } from './complaint-paths';
 
 interface FallbackAuthority {
   name: string;
@@ -101,11 +102,13 @@ export class FraudService {
   private textAnalyzer = new TextAnalyzer();
   private documentProcessor = new DocumentProcessor();
   private riskScorer = new RiskScorer();
-  private aiExplainer = new AiExplainer();
 
   async scanText(userId: string, text: string, inputType: 'sms' | 'text' | 'email') {
-    const textResult = this.textAnalyzer.analyze(text, inputType);
+    // AI-powered text analysis — no regex classification
+    const textResult = await this.textAnalyzer.analyze(text, inputType);
+    const aiVerdict = textResult.aiVerdict;
 
+    // Extract URLs for real network analysis (factual, not classification)
     const urlRegex = /https?:\/\/[^\s<>"']+/gi;
     const bareUrlRegex = /\b[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.(?:[a-z]{2,}|online|xyz|top|buzz|click|club|work|tk|ml|ga|cf|gq)(?:\/[^\s<>"']*)?/gi;
     const fullUrls = text.match(urlRegex) || [];
@@ -120,29 +123,17 @@ export class FraudService {
       } catch { /* skip failed URL analyses */ }
     }
 
-    const urlIndicatorTypes = new Set(['URL_SHORTENER', 'SUSPICIOUS_TLD', 'LOOKALIKE', 'NO_HTTPS', 'IP_ADDRESS_URL']);
-    const textOnlyIndicators = textResult.indicators.filter((ind) => !urlIndicatorTypes.has(ind.indicator));
+    // Use AI verdict for risk scoring (not regex-based risk scorer)
+    const riskScore = aiVerdict ? { score: aiVerdict.riskScore, level: aiVerdict.riskLevel } : this.riskScorer.calculateScore(textResult.indicators.map(i => ({ indicator: i.indicator, severity: i.severity as 'low' | 'medium' | 'high' | 'critical', description: i.description, evidence: i.evidence })));
 
-    const allIndicators = [
-      ...textOnlyIndicators.map((ind) => ({
-        indicator: ind.indicator,
-        severity: ind.severity,
-        description: ind.description,
-        evidence: ind.evidence,
-        score: ind.score,
-      })),
-      ...urlResults.flatMap((ur) =>
-        ur.indicators.map((ind) => ({
-          indicator: ind.indicator,
-          severity: ind.severity,
-          description: ind.description,
-          evidence: ind.evidence || '',
-          score: undefined as number | undefined,
-        }))
-      ),
-    ];
-
-    const riskScore = this.riskScorer.calculateScore(allIndicators);
+    // Build indicators array for DB storage
+    const allIndicators = textResult.indicators.map((ind) => ({
+      indicator: ind.indicator,
+      severity: ind.severity,
+      description: ind.description,
+      evidence: ind.evidence,
+      score: ind.score,
+    }));
 
     const redactedContent = redactSensitiveData(text);
     const report = await prisma.fraudReport.create({
@@ -154,6 +145,7 @@ export class FraudService {
         riskLevel: riskScore.level,
         analysis: JSON.stringify({
           textAnalysis: textResult,
+          aiVerdict: aiVerdict ? { isScam: aiVerdict.isScam, scamType: aiVerdict.scamType, confidence: aiVerdict.confidence } : null,
           urlResults: urlResults.map((ur) => ({
             url: ur.url,
             domain: ur.domain,
@@ -182,25 +174,8 @@ export class FraudService {
       });
     }
 
-    let aiExplanation;
-    try {
-      aiExplanation = await this.aiExplainer.generateExplanation(
-        riskScore.score,
-        riskScore.level,
-        allIndicators,
-        inputType,
-        redactedContent.substring(0, 200)
-      );
-    } catch {
-      aiExplanation = {
-        explanation: `This ${inputType} was analyzed and found to have ${allIndicators.length} indicator(s) with a risk score of ${riskScore.score}/100.`,
-        recommendedActions:
-          riskScore.score > 40
-            ? ['Do not click any links', 'Do not share personal information', 'Verify through official channels']
-            : ['Exercise normal caution'],
-        disclaimer: 'This is an automated analysis.',
-      };
-    }
+    // Build explanation from AI verdict (not regex-based ai explainer)
+    const aiExplanation = this.buildExplanationFromVerdict(aiVerdict, riskScore.score, riskScore.level, allIndicators, inputType);
 
     return {
       id: report.id,
@@ -221,6 +196,34 @@ export class FraudService {
     };
   }
 
+  /** Build AiExplanation-shaped object from AI verdict */
+  private buildExplanationFromVerdict(
+    aiVerdict: import('./ai-fraud-classifier').AIFraudVerdict | undefined,
+    riskScore: number,
+    riskLevel: string,
+    _indicators: Array<{ indicator: string; severity: string; description: string; evidence: string }>,
+    inputType: string
+  ): AiExplanation {
+    if (aiVerdict) {
+      const complaintPath = getComplaintPathForType(aiVerdict.scamType);
+      return {
+        explanation: aiVerdict.explanation,
+        recommendedActions: aiVerdict.recommendedActions,
+        disclaimer: 'This analysis is powered by AI. Always verify through official channels.',
+        complaintPath: complaintPath || undefined,
+      };
+    }
+    // Fallback if AI verdict unavailable
+    return {
+      explanation: `This ${inputType} was analyzed with a risk score of ${riskScore}/100 (${riskLevel}).`,
+      recommendedActions: riskScore > 40
+        ? ['Do not click any links', 'Do not share personal information', 'Verify through official channels']
+        : ['Exercise normal caution'],
+      disclaimer: 'AI analysis service was unavailable. This is a preliminary assessment.',
+      complaintPath: undefined,
+    };
+  }
+
   async scanUrl(userId: string, url: string) {
     if (!isSafeUrl(url)) {
       throw new Error('URL blocked: potential SSRF risk');
@@ -228,29 +231,33 @@ export class FraudService {
 
     const analysis = await this.urlAnalyzer.analyzeUrl(url);
 
-    let aiExplanation;
-    try {
-      aiExplanation = await this.aiExplainer.generateExplanation(
-        analysis.riskScore,
-        analysis.riskLevel,
-        analysis.indicators.map((ind) => ({
-          indicator: ind.indicator,
-          severity: ind.severity,
-          description: ind.description,
-          evidence: ind.evidence || '',
-        })),
-        'url',
-        url.substring(0, 200)
-      );
-    } catch {
-      aiExplanation = {
-        explanation: analysis.analysis,
-        recommendedActions: analysis.riskScore > 40
-          ? ['Do not visit this URL', 'Do not enter personal information', 'Verify the domain through official channels']
-          : ['Exercise normal caution'],
-        disclaimer: '',
-      };
+    // Build explanation from analysis data — AI classification already done inside url-analyzer
+    // Detect scam type from indicators for proper complaint guide
+    const indicatorIds = analysis.indicators.map(i => i.indicator);
+    const hasBrandImpersonation = indicatorIds.includes('BRAND_IMPERSONATION_CONTENT');
+    const hasPhishingForm = indicatorIds.includes('PHISHING_LOGIN_FORM') || indicatorIds.includes('CARD_DATA_COLLECTION') || indicatorIds.includes('FORM_ACTION_EXTERNAL');
+    const bankingBrands = ['hbl', 'ubl', 'mcb', 'nbp', 'sbp', 'jazzcash', 'easypaisa', 'bank'];
+    const domainLower = analysis.domain.toLowerCase();
+    const isBankingBrand = bankingBrands.some(b => domainLower.includes(b));
+
+    let scamType = 'Generic Scam';
+    if ((hasBrandImpersonation || hasPhishingForm) && isBankingBrand) {
+      scamType = 'Bank/Wallet Phishing';
+    } else if (hasPhishingForm) {
+      scamType = 'Bank/Wallet Phishing';
+    } else if (hasBrandImpersonation) {
+      scamType = 'Bank/Wallet Phishing';
     }
+
+    const complaintPath = getComplaintPathForType(scamType);
+    const aiExplanation = {
+      explanation: analysis.analysis,
+      recommendedActions: analysis.riskScore > 40
+        ? ['Do not visit this URL', 'Do not enter personal information', 'Verify the domain through official channels']
+        : ['Exercise normal caution'],
+      disclaimer: 'This analysis is powered by AI. Always verify through official channels.',
+      complaintPath: complaintPath || undefined,
+    };
 
     const scan = await prisma.urlScan.create({
       data: {
@@ -291,6 +298,25 @@ export class FraudService {
       indicators: analysis.indicators,
       analysis: aiExplanation.explanation || analysis.analysis,
       explanation: aiExplanation,
+      // Content analysis data
+      pageExists: analysis.pageExists,
+      sslIssuer: analysis.sslIssuer,
+      responseTime: analysis.responseTime,
+      contentAnalysis: analysis.contentAnalysis ? {
+        pageTitle: analysis.contentAnalysis.pageTitle,
+        metaDescription: analysis.contentAnalysis.metaDescription,
+        hasLoginForm: analysis.contentAnalysis.hasLoginForm,
+        hasPasswordFields: analysis.contentAnalysis.hasPasswordFields,
+        hasCreditCardFields: analysis.contentAnalysis.hasCreditCardFields,
+        detectedBrands: analysis.contentAnalysis.detectedBrands,
+        topicCategory: analysis.contentAnalysis.topicCategory,
+        isParkedDomain: analysis.contentAnalysis.isParkedDomain,
+        isEmptyPage: analysis.contentAnalysis.isEmptyPage,
+        suspiciousScripts: analysis.contentAnalysis.suspiciousScripts,
+        externalLinks: analysis.contentAnalysis.externalLinks,
+        contentSnippet: analysis.contentAnalysis.contentSnippet?.substring(0, 500),
+        language: analysis.contentAnalysis.language,
+      } : undefined,
       createdAt: scan.createdAt,
     };
   }
@@ -304,7 +330,8 @@ export class FraudService {
 
     const docResult = await this.documentProcessor.processFile(file, filename, mimeType);
 
-    const textResult = this.textAnalyzer.analyze(docResult.text || '', 'text');
+    const textResult = await this.textAnalyzer.analyze(docResult.text || '', 'text');
+    const aiVerdict = textResult.aiVerdict;
 
     const urlResults = [];
     for (const url of docResult.urls.slice(0, 5)) {
@@ -321,15 +348,6 @@ export class FraudService {
         evidence: ind.evidence,
         score: ind.score,
       })),
-      ...urlResults.flatMap((ur) =>
-        ur.indicators.map((ind) => ({
-          indicator: ind.indicator,
-          severity: ind.severity,
-          description: ind.description,
-          evidence: ind.evidence || '',
-          score: undefined as number | undefined,
-        }))
-      ),
       ...docResult.indicators.map((i) => ({
         indicator: 'SUSPICIOUS_CONTENT',
         severity: 'medium' as const,
@@ -339,28 +357,13 @@ export class FraudService {
       })),
     ];
 
-    const riskScore = this.riskScorer.calculateScore(allIndicators);
+    // Use AI verdict for risk scoring
+    const riskScore = aiVerdict ? { score: aiVerdict.riskScore, level: aiVerdict.riskLevel } : this.riskScorer.calculateScore(allIndicators.map(i => ({ indicator: i.indicator, severity: i.severity as 'low' | 'medium' | 'high' | 'critical', description: i.description, evidence: i.evidence })));
 
     const redactedContent = redactSensitiveData(docResult.text);
 
-    let aiExplanation;
-    try {
-      aiExplanation = await this.aiExplainer.generateExplanation(
-        riskScore.score,
-        riskScore.level,
-        allIndicators,
-        'pdf',
-        redactedContent.substring(0, 200)
-      );
-    } catch {
-      aiExplanation = {
-        explanation: `Document "${filename}" analyzed with ${allIndicators.length} indicator(s). Risk score: ${riskScore.score}/100.`,
-        recommendedActions: riskScore.score > 40
-          ? ['Do not trust this document without verification', 'Contact the issuing organization directly', 'Check for watermarks and official seals']
-          : ['Exercise normal caution with document contents'],
-        disclaimer: 'This is an automated analysis.',
-      };
-    }
+    // Build explanation from AI verdict
+    const aiExplanation = this.buildExplanationFromVerdict(aiVerdict, riskScore.score, riskScore.level, allIndicators, 'document');
 
     const report = await prisma.fraudReport.create({
       data: {

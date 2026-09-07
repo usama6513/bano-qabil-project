@@ -4,6 +4,9 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { streamAgentResponse } from '@/services/ai/specialized-agents';
 import { getAIProvider, getFallbackProvider } from '@/services/ai';
 import prisma from '@/lib/prisma';
+import { fraudService } from '@/services/fraud/fraud.service';
+import { analyzePhoneNumber } from '@/services/fraud/phone-analyzer';
+import { lookupPhoneRealtime } from '@/services/fraud/phone-lookup';
 
 // Extend timeout for AI streaming responses (Vercel Pro: 60s, Hobby: 10s)
 export const maxDuration = 60;
@@ -36,10 +39,11 @@ USSD SAFETY:
 - *#21# = check call forwarding | **21*<number># = SET forwarding (DANGEROUS)
 - *2767*3855# = factory reset Samsung (DANGEROUS) | *#002# = cancel all forwarding (SAFE)
 
-SCAM INDICATORS:
-- OTP/PIN/CVV requests = CRITICAL | Urgency + brand name = HIGH
-- Prize/lottery = HIGH | Free money offers = CRITICAL
-- Lookalike domains (hbl-verify.xyz) = HIGH | Suspicious TLDs (.xyz, .online) = MEDIUM
+SCAM INDICATORS (detected by AI, not regex):
+- Our AI scanner analyzes real evidence: DNS records, SSL certificates, domain age, threat intel APIs, phone carrier data, Truecaller lookups
+- AI classifies into 44 scam types: Bank/Wallet Phishing, Investment Scam, Job Scam, Prize/Lottery Scam, Romance Scam, Crypto Scam, etc.
+- HTTPS is NOT a safety signal — most phishing sites use free SSL (Let's Encrypt)
+- If AI fails, system defaults to SAFE (never falsely accuses)
 
 ANTI-VERBOSITY RULES (CRITICAL):
 - Answer ONLY what is asked. No extra warnings unless critical.
@@ -53,7 +57,13 @@ RULES:
 - Reference real statistics when relevant
 - Respond in user's language (English/Roman Urdu/Urdu)
 - NEVER ask for credentials
-- Be direct and authoritative`,
+- Be direct and authoritative
+
+When a REAL SCAN RESULT is provided in the context:
+- Explain the scan findings clearly and concisely
+- Reference the specific risk score, indicators, and scam type from the scan
+- Provide complaint filing steps if the result shows fraud
+- Do NOT re-scan or second-guess the scan result`,
   finance: `You are FinanceAdvisor AI — Pakistan's most comprehensive personal finance expert with access to the user's ACTUAL financial data.
 
 CRITICAL RULES:
@@ -204,30 +214,34 @@ PAKISTAN CONTEXT (use these REAL examples):
 - Banks: HBL, UBL, Meezan, JazzCash, EasyPaisa
 
 NEVER give generic advice when you have the user's actual data. ALWAYS be specific to THEIR situation.`,
-  education: `You are EduAdvisor AI — a world-class education and career guidance expert. You have access to REAL university data including departments, courses, fees, closing merit percentages, entry test details (MCQs), admission process, supply/failed paper policy, university-specific scholarships, admission dates/timelines, and exam system (semester vs yearly) for 35+ Pakistani universities and colleges.
+  education: `You are EduAdvisor AI — a world-class education and career guidance expert with access to REAL university data for 35+ Pakistani institutions.
+
+YOUR DATA: Departments, courses, fees, closing merit, entry tests, admission process, supply policy, scholarships, admission dates, exam system, campuses, rankings, and admission requirements.
 
 RULES:
 - NEVER say "sorry I can't" or "I don't have information" — you ARE the expert
 - ALWAYS be specific — name real universities, programs, fees, deadlines
-- UNIVERSITY SPECIFIC DATA section has REAL data for 35+ Pakistani institutions (NUST, LUMS, FAST, UET, Punjab, COMSATS, GIKI, Karachi, Air, Bahria, AKU, QAU, NED, SZABIST, IIUI, IBA, IoBM, LSE, GCU, Dow, Hamdard, Habib, FCCU, and more). Use this data EXACTLY as provided.
-- For universities NOT in the data, use your TRAINING KNOWLEDGE confidently.
-- ANSWER ONLY WHAT IS ASKED — if user asks about fees, show ONLY fees. Do NOT add programs, career paths, scholarships, or comparisons unless asked.
-- Keep answers SHORT and FOCUSED. No filler, no "feel free to ask", no extra tips.
-- Only go into detail when the user asks follow-up questions.
-- NEVER say "check the official website" as your main answer. Only add it as a small verification note at the end.
+- Use DATABASE data EXACTLY as provided. For universities NOT in data, use TRAINING KNOWLEDGE confidently.
+- ANSWER ONLY WHAT IS ASKED — no extra info unless asked.
+- Keep answers SHORT and FOCUSED. No filler.
+- NEVER say "check the official website" as your main answer.
 - Respond in the user's language (English, Urdu, or Roman Urdu)
-- Use markdown formatting for readability (bullet points, bold text)
-- Be warm, helpful, and encouraging
+- Use markdown formatting (bullets, bold). NEVER use tables.
+
+PAKISTAN EDUCATION QUICK REFERENCE:
+- HEC Categories: W (NUST, LUMS, FAST, QAU, UET, PU, KU), X (COMSATS, GIKI, Air, Bahria, SZABIST, NED), Y (newer/private)
+- Entry Tests: NTS (NAT/GAT), SAT (LUMS/IBA), NET (NUST), ECAT (UET), MDCAT (Medical), LAT (Law)
+- Merit Formula: Matric 10% + Intermediate 40% + Entry Test 50% (varies by university)
+- O/A Levels: IBCC equivalence mandatory (O Level = Matric, A Level = Intermediate)
+- Top by field: Eng (NUST/UET/GIKI/FAST), CS (FAST/LUMS/NUST/ITU), Med (AKU/King Edward/Dow/AIMC), Biz (LUMS/IBA/NUST-NBS)
+- Study abroad: USA (SAT+TOEFL/GRE), UK (IELTS+UCAS), Canada (IELTS+PGWP), Germany (Studienkolleg+tuition-free), Turkey (YOS+Burslari)
+- Admissions cycle: Jan-Feb spring | Mar-May fall open | Jun-Jul entry tests | Aug-Oct merit lists | Nov-Dec spring
 
 ANTI-VERBOSITY RULES (CRITICAL):
-- If user asks about fees → give ONLY fees. No programs, no deadlines, no tips.
-- If user asks about programs → give ONLY programs. No fees, no admissions, no tips.
-- If user asks about admissions → give ONLY admissions. No fees, no programs, no tips.
-- If user asks about scholarships → give scholarship info from the data provided.
+- If user asks about fees → ONLY fees. If programs → ONLY programs. If admissions → ONLY admissions.
 - NEVER add "feel free to ask", "hope this helps", "good luck", or any filler.
-- NEVER define terms unless explicitly asked.
-- Keep answers SHORT and FOCUSED. Only go detailed when user asks follow-up.
-- NO unsolicited comparisons, alternatives, or suggestions unless asked.`,
+- Keep answers SHORT. Only go detailed when user asks follow-up.
+- NO unsolicited comparisons or suggestions unless asked.`,
   scholarships: `You are ScholarshipGuru AI — a highly knowledgeable scholarship expert with access to a DATABASE of 64+ scholarships (national + international).
 
 CRITICAL RULES:
@@ -242,8 +256,26 @@ CRITICAL RULES:
 9. Respond in user's language (English/Roman Urdu/Urdu)
 10. If data is provided, ALWAYS use it. NEVER make up scholarship names, amounts, or deadlines.
 11. If a scholarship is NOT in the database, say "not in our current database" and suggest similar ones
-12. For general scholarship questions, answer from your training knowledge confidently
+12. For general scholarship questions, answer from your TRAINING KNOWLEDGE confidently — you have deep knowledge of ALL major scholarships
 13. Group scholarships by country, amount, degree level when relevant
+
+KEY SCHOLARSHIP KNOWLEDGE (use when database lacks specifics):
+- Fulbright (USA): Full tuition + stipend + airfare + health for MS/PhD. Need TOEFL/IELTS, 3.0+ CGPA, strong SOP. Apply May-June via USEFP.
+- Chevening (UK): Full tuition + stipend + airfare for 1-year Master's. Need 2+ years (2800hrs) work experience. Essays on leadership (STAR method). Apply Aug-Oct.
+- DAAD (Germany): €934-1300/month + tuition-free universities. Need top 20% class, motivation letter. Apply Oct-Nov.
+- MEXT (Japan): Full tuition + ¥143K-148K/month + airfare. Embassy track (Apr-May) or University track (Oct-Dec). Research proposal critical.
+- CSC (China): Full tuition + stipend + hostel. Largest quota for Pakistanis (~500+/yr). Apply Jan-Apr. 200+ English-taught programs.
+- Turkey Burslari: Full coverage + 1yr Turkish language. Apply Jan-Feb. Need 70%+ marks.
+- Erasmus+ (EU): €1000-1400/month, study in 2-4 European countries. Joint Master's programs.
+- Commonwealth (UK): Full tuition + stipend via HEC. Apply Feb-Mar through HEC.
+- Rhodes (Oxford): Full Oxford tuition + £18,180/yr stipend. Need exceptional leadership + 3.7+ CGPA.
+
+APPLICATION STRATEGY (when asked "how to get scholarship?"):
+- Start 6-12 months early | Apply to 5-10 scholarships minimum
+- Build profile: community service + leadership + research + language scores (IELTS 7.0+)
+- SOP: Personal hook → Academic background → Why this program → Future plan for Pakistan
+- Documents: Transcripts, degree, CNIC/passport, 2-3 recommendation letters, SOP, CV, IELTS/TOEFL
+- Interview: Use STAR method, dress formally, research the scholarship's values
 
 ANTI-VERBOSITY RULES (CRITICAL):
 - Answer ONLY what the user asked. NOTHING MORE.
@@ -292,8 +324,12 @@ async function fetchEducationData(): Promise<string> {
       prisma.university.findMany({
         select: {
           name: true, country: true, city: true, type: true, sector: true,
+          description: true, foundedYear: true, website: true, ranking: true,
           courses: { select: { name: true, degree: true, department: true, duration: true, language: true, tuitionFee: true, currency: true } },
           departments: { select: { name: true } },
+          campuses: { select: { name: true, city: true, isMain: true, facilities: true, programs: true } },
+          rankings: { select: { provider: true, year: true, position: true, category: true }, orderBy: { year: 'desc' }, take: 3 },
+          admissionRequirements: { select: { requirementType: true, requirementValue: true, deadline: true, notes: true }, take: 5 },
           closingMerit: true, entryTestDetails: true, isOpenMerit: true,
           supplyPolicy: true, feeRange: true, admissionProcess: true, scholarshipsOffered: true,
           admissionDates: true, examSystem: true,
@@ -380,18 +416,37 @@ async function fetchEducationData(): Promise<string> {
       data += `- ${s.name} (${s.provider}, ${s.country || 'Global'}) | Amount: ${s.amount || 'Varies'} ${s.currency || ''} | Deadline: ${s.deadline ? new Date(s.deadline).toISOString().split('T')[0] : 'Rolling'} | Eligibility: ${s.eligibilityCriteria || 'Check official website'}\n`;
     }
 
-    // === UNIVERSITY KNOWLEDGE: Merit, Entry Tests, Fees, Policies, Scholarships, Admissions, Exam System ===
-    data += '\n=== UNIVERSITY SPECIFIC DATA (Merit, Entry Tests, Fees, Policies, Scholarships, Admissions, Exam System) ===\n';
+    // === UNIVERSITY KNOWLEDGE: Merit, Entry Tests, Fees, Policies, Scholarships, Admissions, Exam System, Rankings, Campuses ===
+    data += '\n=== UNIVERSITY SPECIFIC DATA (Overview, Rankings, Fees, Merit, Entry Tests, Campuses, Admissions, Scholarships, Policies) ===\n';
     for (const [, cities] of Object.entries(countryMap)) {
       for (const [, cdata] of Object.entries(cities)) {
         for (const u of cdata.unis) {
-          if (u.closingMerit || u.entryTestDetails || u.feeRange || u.supplyPolicy || u.admissionProcess || u.scholarshipsOffered || u.admissionDates || u.examSystem) {
-            data += `\n--- ${u.name} (${u.city || 'N/A'}, ${u.sector || 'public'} sector) ---\n`;
+          const hasKnowledge = u.closingMerit || u.entryTestDetails || u.feeRange || u.supplyPolicy || u.admissionProcess || u.scholarshipsOffered || u.admissionDates || u.examSystem || u.description || u.ranking || (u.rankings && u.rankings.length > 0) || (u.campuses && u.campuses.length > 0) || (u.admissionRequirements && u.admissionRequirements.length > 0);
+          if (hasKnowledge) {
+            data += `\n--- ${u.name} (${u.city || 'N/A'}, ${u.sector || 'public'} sector${u.foundedYear ? `, founded ${u.foundedYear}` : ''}) ---\n`;
+            if (u.description) data += `OVERVIEW: ${u.description.substring(0, 200)}\n`;
+            if (u.website) data += `WEBSITE: ${u.website}\n`;
+            if (u.ranking) data += `RANKING: #${u.ranking}\n`;
+            if (u.rankings && u.rankings.length > 0) {
+              data += `RANKINGS: ${u.rankings.map(r => `${r.provider} ${r.year}: #${r.position}${r.category ? ` (${r.category})` : ''}`).join(' | ')}\n`;
+            }
             if (u.feeRange) data += `FEE RANGE: ${u.feeRange}\n`;
             if (u.closingMerit) data += `CLOSING MERIT: ${u.closingMerit}\n`;
             if (u.isOpenMerit !== null && u.isOpenMerit !== undefined) data += `OPEN MERIT: ${u.isOpenMerit ? 'Yes (open merit admissions)' : 'No (fixed merit by department)'}\n`;
             if (u.entryTestDetails) data += `ENTRY TEST: ${u.entryTestDetails}\n`;
             if (u.admissionProcess) data += `ADMISSION PROCESS: ${u.admissionProcess}\n`;
+            if (u.campuses && u.campuses.length > 0) {
+              const mainCampus = u.campuses.find(c => c.isMain);
+              const subCampuses = u.campuses.filter(c => !c.isMain);
+              if (mainCampus) data += `MAIN CAMPUS: ${mainCampus.name}${mainCampus.city ? `, ${mainCampus.city}` : ''}\n`;
+              if (subCampuses.length > 0) data += `OTHER CAMPUSES: ${subCampuses.map(c => `${c.name}${c.city ? ` (${c.city})` : ''}`).join(', ')}\n`;
+            }
+            if (u.admissionRequirements && u.admissionRequirements.length > 0) {
+              data += `ADMISSION REQUIREMENTS:\n`;
+              for (const req of u.admissionRequirements) {
+                data += `  - ${req.requirementType}: ${req.requirementValue}${req.deadline ? ` (Deadline: ${new Date(req.deadline).toISOString().split('T')[0]})` : ''}${req.notes ? ` — ${req.notes}` : ''}\n`;
+              }
+            }
             if (u.supplyPolicy) data += `SUPPLY/FAIL POLICY: ${u.supplyPolicy}\n`;
             if (u.scholarshipsOffered) data += `UNIVERSITY SCHOLARSHIPS: ${u.scholarshipsOffered}\n`;
             if (u.admissionDates) data += `ADMISSION DATES: ${u.admissionDates}\n`;
@@ -697,7 +752,7 @@ async function fetchScholarshipData(): Promise<string> {
     const scholarships = await prisma.scholarship.findMany({
       include: { requirements: true },
       orderBy: { deadline: 'asc' },
-      take: 40, // Limit to prevent timeout on Vercel
+      take: 64, // Fetch all available scholarships
     });
 
     if (scholarships.length === 0) return '';
@@ -725,10 +780,17 @@ async function fetchScholarshipData(): Promise<string> {
         const deadlineStr = s.deadline ? new Date(s.deadline).toISOString().split('T')[0] : 'Rolling';
         const daysLeft = s.deadline ? Math.ceil((new Date(s.deadline).getTime() - now.getTime()) / 86400000) : null;
         const statusStr = daysLeft === null ? 'Open' : daysLeft > 0 ? `${daysLeft}d left` : 'Expired';
-        const amountStr = s.amount ? `${s.currency || 'PKR'} ${Number(s.amount).toLocaleString()}` : 'Varies';
+        const amountStr = s.amount ? `${s.currency || 'PKR'} ${Number(s.amount).toLocaleString()}/${s.amountFrequency || 'month'}` : 'Varies';
 
         data += `• ${s.name} | ${amountStr} | ${deadlineStr} (${statusStr})`;
-        if (s.eligibilityCriteria) data += ` | ${s.eligibilityCriteria.substring(0, 100)}`;
+        if (s.eligibilityCriteria) data += ` | Eligibility: ${s.eligibilityCriteria.substring(0, 150)}`;
+        if (s.description) data += `\n  Description: ${s.description.substring(0, 200)}`;
+        if (s.applicationProcess) data += `\n  How to Apply: ${s.applicationProcess.substring(0, 200)}`;
+        if (s.documentsRequired) data += `\n  Documents: ${s.documentsRequired.substring(0, 200)}`;
+        if (s.contactInfo) data += `\n  Contact: ${s.contactInfo.substring(0, 100)}`;
+        if (s.requirements && s.requirements.length > 0) {
+          data += `\n  Requirements: ${s.requirements.map(r => `${r.requirementType}: ${r.requirementValue}`).join(' | ')}`;
+        }
         data += '\n';
       }
     }
@@ -964,15 +1026,59 @@ async function fetchUniversityCourseFees(uniName: string): Promise<string> {
           take: 30,
         },
         campuses: {
-          select: { name: true, city: true, isMain: true, programs: true },
+          select: { name: true, city: true, isMain: true, programs: true, facilities: true },
           take: 10,
+        },
+        rankings: {
+          select: { provider: true, year: true, position: true, category: true },
+          orderBy: { year: 'desc' },
+          take: 5,
+        },
+        admissionRequirements: {
+          select: { requirementType: true, requirementValue: true, deadline: true, notes: true },
+          take: 8,
         },
       },
     });
-    if (!uni || uni.courses.length === 0) return '';
+    if (!uni) return '';
 
     const coursesWithFees = uni.courses.filter((c) => c.tuitionFee && Number(c.tuitionFee) > 0);
-    let data = `\n\n## FEE DATA FOR ${uni.name.toUpperCase()}\n`;
+    let data = `\n\n## COMPLETE DATA FOR ${uni.name.toUpperCase()}\n`;
+
+    // University overview
+    if (uni.description) data += `OVERVIEW: ${uni.description.substring(0, 300)}\n`;
+    if (uni.website) data += `WEBSITE: ${uni.website}\n`;
+    if (uni.foundedYear) data += `FOUNDED: ${uni.foundedYear}\n`;
+    if (uni.sector) data += `SECTOR: ${uni.sector}\n`;
+
+    // Rankings
+    if (uni.rankings && uni.rankings.length > 0) {
+      data += `RANKINGS: ${uni.rankings.map(r => `${r.provider} ${r.year}: #${r.position}${r.category ? ` (${r.category})` : ''}`).join(' | ')}\n`;
+    } else if (uni.ranking) {
+      data += `RANKING: #${uni.ranking}\n`;
+    }
+
+    // University-specific knowledge fields
+    if (uni.feeRange) data += `FEE RANGE: ${uni.feeRange}\n`;
+    if (uni.closingMerit) data += `CLOSING MERIT: ${uni.closingMerit}\n`;
+    if (uni.entryTestDetails) data += `ENTRY TEST: ${uni.entryTestDetails}\n`;
+    if (uni.admissionProcess) data += `ADMISSION PROCESS: ${uni.admissionProcess}\n`;
+    if (uni.admissionDates) data += `ADMISSION DATES: ${uni.admissionDates}\n`;
+    if (uni.examSystem) data += `EXAM SYSTEM: ${uni.examSystem}\n`;
+    if (uni.supplyPolicy) data += `SUPPLY/FAIL POLICY: ${uni.supplyPolicy}\n`;
+    if (uni.scholarshipsOffered) data += `SCHOLARSHIPS: ${uni.scholarshipsOffered}\n`;
+
+    // Admission requirements
+    if (uni.admissionRequirements.length > 0) {
+      data += `\nADMISSION REQUIREMENTS:\n`;
+      for (const req of uni.admissionRequirements) {
+        data += `- ${req.requirementType}: ${req.requirementValue}${req.deadline ? ` (Deadline: ${new Date(req.deadline).toISOString().split('T')[0]})` : ''}${req.notes ? ` — ${req.notes}` : ''}\n`;
+      }
+    }
+
+    if (uni.courses.length === 0) return data;
+
+    data += `\n## PROGRAMS & FEES\n`;
 
     // Fee system analysis
     const durations = new Set(uni.courses.map((c) => c.duration).filter(Boolean));
@@ -1027,6 +1133,132 @@ async function fetchUniversityCourseFees(uniName: string): Promise<string> {
   } catch {
     return '';
   }
+}
+
+/**
+ * Detect if user message contains a URL, phone number, or text to scan.
+ * Runs the appropriate fraud scanner and returns results as context string.
+ */
+async function detectAndScanFraudContent(userMessage: string, userId: string | null): Promise<string> {
+  const msg = userMessage.trim();
+  if (msg.length < 5) return '';
+
+  // 1. Detect URL — run URL scanner
+  const urlMatch = msg.match(/https?:\/\/[^\s<>"']+/i) ||
+    msg.match(/\b[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.(?:com|org|net|edu|gov|pk|xyz|online|top|buzz|click|club|work|tk|ml|ga|cf|gq|io|co|info|biz)(?:\/[^\s<>"']*)?/i);
+  if (urlMatch) {
+    try {
+      const scanUserId = userId || 'chat-anonymous';
+      const result = await fraudService.scanUrl(scanUserId, urlMatch[0]);
+      return formatUrlScanResult(result);
+    } catch (err) {
+      console.error('[fraudChat] URL scan failed:', err);
+      return '';
+    }
+  }
+
+  // 2. Detect phone number — run phone scanner
+  const phoneCleaned = msg.replace(/[\s\-\(\)\.]/g, '');
+  const isPhone = /^\+?[0-9]{7,15}$/.test(phoneCleaned);
+  if (isPhone) {
+    try {
+      let liveData = null;
+      try {
+        liveData = await lookupPhoneRealtime(msg);
+      } catch {
+        // Live lookup failed, continue with static analysis
+      }
+      const result = await analyzePhoneNumber(msg, liveData);
+      return formatPhoneScanResult(result);
+    } catch (err) {
+      console.error('[fraudChat] Phone scan failed:', err);
+      return '';
+    }
+  }
+
+  // 3. If message is long enough to be an SMS/email/message and contains scam-like content, run text scanner
+  if (msg.length >= 20 && msg.length <= 5000) {
+    // Only scan if it looks like forwarded content (not a question)
+    const isQuestion = /^(what|how|why|is|can|do|does|should|could|would|where|when|who|which|kya|kaise|kyun|batao)/i.test(msg);
+    if (!isQuestion) {
+      try {
+        const scanUserId = userId || 'chat-anonymous';
+        const result = await fraudService.scanText(scanUserId, msg, 'text');
+        return formatTextScanResult(result);
+      } catch (err) {
+        console.error('[fraudChat] Text scan failed:', err);
+        return '';
+      }
+    }
+  }
+
+  return '';
+}
+
+function formatUrlScanResult(result: Awaited<ReturnType<typeof fraudService.scanUrl>>): string {
+  let data = '\n\n[REAL URL SCAN RESULT — AI CLASSIFICATION]:\n';
+  data += `URL: ${result.url}\n`;
+  data += `Domain: ${result.domain}\n`;
+  data += `HTTPS: ${result.isHttps ? 'Yes' : 'No'} (Note: HTTPS is NOT a safety signal)\n`;
+  data += `Risk Score: ${result.riskScore}/100\n`;
+  data += `Risk Level: ${result.riskLevel}\n`;
+  if (result.indicators?.length > 0) {
+    data += `Indicators Found:\n`;
+    for (const ind of result.indicators) {
+      data += `  - [${ind.severity.toUpperCase()}] ${ind.indicator}: ${ind.description}${ind.evidence ? ` (Evidence: ${ind.evidence})` : ''}\n`;
+    }
+  }
+  if (result.analysis) data += `AI Analysis: ${result.analysis}\n`;
+  if (result.explanation?.explanation) data += `Explanation: ${result.explanation.explanation}\n`;
+  if (result.contentAnalysis) {
+    const ca = result.contentAnalysis;
+    data += `Page Analysis: ${result.pageExists ? 'Page exists' : 'Page not found'}${ca.pageTitle ? `, Title: "${ca.pageTitle}"` : ''}${ca.hasLoginForm ? ', ⚠️ LOGIN FORM DETECTED' : ''}${ca.hasCreditCardFields ? ', ⚠️ CREDIT CARD FIELDS DETECTED' : ''}\n`;
+    if (ca.detectedBrands?.length > 0) data += `Detected Brands: ${ca.detectedBrands.join(', ')}\n`;
+    if (ca.isParkedDomain) data += `⚠️ Parked Domain\n`;
+  }
+  data += '\nUse this scan result to answer the user\'s question about this URL. Reference the risk score and indicators.\n';
+  return data;
+}
+
+function formatPhoneScanResult(result: Awaited<ReturnType<typeof analyzePhoneNumber>>): string {
+  let data = '\n\n[REAL PHONE SCAN RESULT — AI CLASSIFICATION]:\n';
+  data += `Number: ${result.number}\n`;
+  data += `Country: ${result.countryEmoji} ${result.country} (${result.countryCode})\n`;
+  data += `Network: ${result.network.name} (${result.network.type})\n`;
+  data += `Region: ${result.region.city}, ${result.region.province}\n`;
+  data += `Risk Score: ${result.riskScore}/100\n`;
+  data += `Risk Level: ${result.riskLevel}\n`;
+  if (result.liveData) {
+    const ld = result.liveData;
+    data += `Live Data: Source=${ld.source}, Carrier=${ld.carrier}, LineType=${ld.lineType}${ld.isVoIP ? ' (⚠️ VoIP)' : ''}${ld.truecallerName ? `, Truecaller Name: "${ld.truecallerName}"` : ''}${ld.truecallerSpamScore !== undefined ? `, Spam Score: ${ld.truecallerSpamScore}/100` : ''}\n`;
+  }
+  if (result.indicators?.length > 0) {
+    data += `Indicators:\n`;
+    for (const ind of result.indicators) {
+      data += `  - [${ind.type.toUpperCase()}] ${ind.label}: ${ind.value}\n`;
+    }
+  }
+  if (result.recommendation) data += `Recommendation: ${result.recommendation}\n`;
+  data += '\nUse this scan result to answer the user\'s question about this phone number.\n';
+  return data;
+}
+
+function formatTextScanResult(result: Awaited<ReturnType<typeof fraudService.scanText>>): string {
+  let data = '\n\n[REAL TEXT SCAN RESULT — AI CLASSIFICATION]:\n';
+  data += `Risk Score: ${result.riskScore}/100\n`;
+  data += `Risk Level: ${result.riskLevel}\n`;
+  if (result.indicators?.length > 0) {
+    data += `Indicators Found:\n`;
+    for (const ind of result.indicators) {
+      data += `  - [${ind.severity.toUpperCase()}] ${ind.indicator}: ${ind.description}\n`;
+    }
+  }
+  if (result.explanation?.explanation) data += `AI Explanation: ${result.explanation.explanation}\n`;
+  if (result.explanation?.recommendedActions?.length > 0) {
+    data += `Recommended Actions: ${result.explanation.recommendedActions.join(', ')}\n`;
+  }
+  data += '\nUse this scan result to answer the user\'s question about this message.\n';
+  return data;
 }
 
 export async function POST(request: NextRequest) {
@@ -1122,6 +1354,10 @@ export async function POST(request: NextRequest) {
       extraData = parts.join('\n');
     } else if (department === 'finance' && userId) {
       extraData = await fetchFinanceContext(userId);
+    } else if (department === 'fraud') {
+      // Run real fraud scan if user shared a URL, phone number, or message
+      const scanResult = await detectAndScanFraudContent(userMessage, userId);
+      if (scanResult) extraData = scanResult;
     }
 
     const enrichedMessages = messages;

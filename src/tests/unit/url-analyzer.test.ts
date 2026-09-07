@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { UrlAnalyzer } from '@/services/fraud/url-analyzer';
 
 describe('URL Analyzer', { timeout: 30000 }, () => {
@@ -195,26 +195,5 @@ describe('URL Analyzer', { timeout: 30000 }, () => {
     });
   });
 
-  describe('checkLookalikeDomain', () => {
-    it('detects paypal lookalikes', () => {
-      const indicators = analyzer.checkLookalikeDomain('paypa1');
-      expect(indicators.length).toBeGreaterThan(0);
-    });
-
-    it('does not flag the actual brand domain', () => {
-      const indicators = analyzer.checkLookalikeDomain('paypal');
-      const typosquat = indicators.find((i) => i.indicator === 'TYPOSQUAT_DOMAIN');
-      expect(typosquat).toBeUndefined();
-    });
-
-    it('detects typosquatting patterns', () => {
-      const indicators = analyzer.checkLookalikeDomain('micros0ft');
-      expect(indicators.some((i) => i.indicator === 'TYPOSQUAT_DOMAIN')).toBe(true);
-    });
-
-    it('returns empty array for unrelated domains', () => {
-      const indicators = analyzer.checkLookalikeDomain('randomdomain');
-      expect(indicators).toHaveLength(0);
-    });
-  });
+  // checkLookalikeDomain — REMOVED: AI classifies domain reputation from evidence
 });

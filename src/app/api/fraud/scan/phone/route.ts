@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       // Live lookup failed, continue with static analysis
     }
 
-    const result = analyzePhoneNumber(phone, liveData);
+    const result = await analyzePhoneNumber(phone, liveData);
     return successResponse(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';

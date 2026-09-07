@@ -1,5 +1,5 @@
 import { getContextForIndicators, scamStats2025 } from './scam-knowledge-base';
-import { getComplaintPathForIndicators, type ComplaintPath } from './complaint-paths';
+import { type ComplaintPath } from './complaint-paths';
 import { analyzeAllUssdCodes, type UssdAnalysis } from './ussd-analyzer';
 
 export interface AiExplanation {
@@ -78,7 +78,7 @@ function buildFallbackExplanation(
     recommendedActions,
     disclaimer: '',
     realWorldContext: buildRealWorldContext(indicators.map((i) => i.indicator)),
-    complaintPath: getComplaintPathForIndicators(indicators.map((i) => i.indicator)),
+    complaintPath: undefined,
     ussdAnalysis: ussdAnalysis.length > 0 ? ussdAnalysis : undefined,
   };
 }
@@ -179,7 +179,7 @@ export class AiExplainer {
         recommendedActions: recommendedActions.slice(0, 5),
         disclaimer: '',
         realWorldContext,
-        complaintPath: getComplaintPathForIndicators(indicators.map((i) => i.indicator)),
+        complaintPath: undefined,
         ussdAnalysis: ussdAnalysis.length > 0 ? ussdAnalysis : undefined,
       };
     } catch {

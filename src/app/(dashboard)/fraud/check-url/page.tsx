@@ -16,6 +16,22 @@ interface Indicator {
   description: string;
 }
 
+interface ContentAnalysis {
+  pageTitle?: string;
+  metaDescription?: string;
+  hasLoginForm: boolean;
+  hasPasswordFields: boolean;
+  hasCreditCardFields: boolean;
+  detectedBrands: string[];
+  topicCategory: string;
+  isParkedDomain: boolean;
+  isEmptyPage: boolean;
+  suspiciousScripts: number;
+  externalLinks: number;
+  contentSnippet?: string;
+  language?: string;
+}
+
 interface ScanResult {
   riskLevel: string;
   riskScore: number;
@@ -24,15 +40,34 @@ interface ScanResult {
   analysis: string;
   actions?: string[];
   realWorldContext?: string;
+  pageExists?: boolean;
+  sslIssuer?: string;
+  responseTime?: number;
+  contentAnalysis?: ContentAnalysis;
   complaintPath?: {
     scamType: string;
     scamTypeUrdu: string;
+    scamTypeRomanUrdu?: string;
     immediateActions: string[];
-    complaintContacts: { name: string; phone: string; website: string; address?: string; hours?: string }[];
+    immediateActionsUrdu?: string[];
+    immediateActionsRomanUrdu?: string[];
+    complaintContacts: { name: string; nameUrdu?: string; nameRomanUrdu?: string; phone: string; website: string; address?: string; addressUrdu?: string; addressRomanUrdu?: string; hours?: string; hoursUrdu?: string; hoursRomanUrdu?: string }[];
     requiredDocuments: string[];
+    requiredDocumentsUrdu?: string[];
+    requiredDocumentsRomanUrdu?: string[];
     onlineComplaintUrl: string;
     timeframe: string;
+    timeframeUrdu?: string;
+    timeframeRomanUrdu?: string;
     additionalTips: string[];
+    additionalTipsUrdu?: string[];
+    additionalTipsRomanUrdu?: string[];
+    evidenceChecklist?: string[];
+    evidenceChecklistUrdu?: string[];
+    evidenceChecklistRomanUrdu?: string[];
+    stepByStepGuide?: string[];
+    stepByStepGuideUrdu?: string[];
+    stepByStepGuideRomanUrdu?: string[];
   };
   ussdAnalysis?: {
     code: string;
@@ -134,6 +169,10 @@ export default function CheckUrlPage() {
         analysis: typeof payload.analysis === 'string' ? payload.analysis : (explanationObj?.explanation || ''),
         actions: explanationObj?.recommendedActions || [],
         realWorldContext: explanationObj?.realWorldContext || undefined,
+        pageExists: payload.pageExists,
+        sslIssuer: payload.sslIssuer,
+        responseTime: payload.responseTime,
+        contentAnalysis: payload.contentAnalysis || undefined,
         complaintPath: explanationObj?.complaintPath || undefined,
         ussdAnalysis: Array.isArray(explanationObj?.ussdAnalysis) ? explanationObj.ussdAnalysis : undefined,
       });
@@ -283,6 +322,26 @@ export default function CheckUrlPage() {
                       {result.domainInfo.redirects ? `Yes → ${result.domainInfo.redirectUrl || 'Unknown'}` : 'No'}
                     </p>
                   </div>
+                  {result.pageExists !== undefined && (
+                    <div>
+                      <span className="text-gray-500">Page Exists</span>
+                      <p className="font-medium text-gray-100">
+                        {result.pageExists ? '✅ Yes — Page is live' : '❌ No — Page not found'}
+                      </p>
+                    </div>
+                  )}
+                  {result.sslIssuer && (
+                    <div>
+                      <span className="text-gray-500">SSL Issuer</span>
+                      <p className="font-medium text-gray-100 truncate">{result.sslIssuer}</p>
+                    </div>
+                  )}
+                  {result.responseTime !== undefined && (
+                    <div>
+                      <span className="text-gray-500">Response Time</span>
+                      <p className="font-medium text-gray-100">{result.responseTime}ms</p>
+                    </div>
+                  )}
                   {result.domainInfo.registrar && (
                     <div>
                       <span className="text-gray-500">Registrar</span>
@@ -296,6 +355,107 @@ export default function CheckUrlPage() {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* CONTENT ANALYSIS SECTION */}
+            {result.contentAnalysis && (
+              <div className="bg-white/5 rounded-lg p-4 mb-4">
+                <h3 className="text-sm font-semibold text-gray-100 mb-3">🔍 Page Content Analysis</h3>
+                
+                {/* Page Title & Topic */}
+                <div className="grid grid-cols-1 gap-3 mb-4">
+                  {result.contentAnalysis.pageTitle && (
+                    <div>
+                      <span className="text-gray-500 text-xs">Page Title</span>
+                      <p className="text-sm font-medium text-gray-100 truncate">{result.contentAnalysis.pageTitle}</p>
+                    </div>
+                  )}
+                  {result.contentAnalysis.topicCategory !== 'general' && result.contentAnalysis.topicCategory !== 'unknown' && (
+                    <div>
+                      <span className="text-gray-500 text-xs">Content Category</span>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded-full text-xs font-medium capitalize">
+                          {result.contentAnalysis.topicCategory.replace('_', ' ')}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  {result.contentAnalysis.language && (
+                    <div>
+                      <span className="text-gray-500 text-xs">Language</span>
+                      <p className="text-sm text-gray-300 uppercase">{result.contentAnalysis.language}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Security Warnings */}
+                {(result.contentAnalysis.hasLoginForm || result.contentAnalysis.hasPasswordFields || result.contentAnalysis.hasCreditCardFields) && (
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-4">
+                    <h4 className="text-xs font-bold text-red-300 mb-2">⚠️ Data Collection Detected</h4>
+                    <div className="space-y-1">
+                      {result.contentAnalysis.hasLoginForm && (
+                        <p className="text-xs text-red-200">• Login form detected on page</p>
+                      )}
+                      {result.contentAnalysis.hasPasswordFields && (
+                        <p className="text-xs text-red-200">• Password input fields found</p>
+                      )}
+                      {result.contentAnalysis.hasCreditCardFields && (
+                        <p className="text-xs text-red-200">• Credit card data collection fields detected</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Detected Brands */}
+                {result.contentAnalysis.detectedBrands.length > 0 && (
+                  <div className="mb-4">
+                    <span className="text-gray-500 text-xs">Brands Mentioned in Content</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {result.contentAnalysis.detectedBrands.slice(0, 10).map((brand, i) => (
+                        <span key={i} className="px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded text-xs capitalize">
+                          {brand}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Technical Indicators */}
+                <div className="grid grid-cols-2 gap-3 text-xs mb-4">
+                  <div>
+                    <span className="text-gray-500">Suspicious Scripts</span>
+                    <p className={`font-medium ${result.contentAnalysis.suspiciousScripts > 3 ? 'text-red-400' : 'text-gray-300'}`}>
+                      {result.contentAnalysis.suspiciousScripts} detected
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">External Links</span>
+                    <p className={`font-medium ${result.contentAnalysis.externalLinks > 20 ? 'text-orange-400' : 'text-gray-300'}`}>
+                      {result.contentAnalysis.externalLinks} links
+                    </p>
+                  </div>
+                  {result.contentAnalysis.isParkedDomain && (
+                    <div>
+                      <span className="text-gray-500">Parked Domain</span>
+                      <p className="font-medium text-yellow-400">Yes — Domain is parked/for sale</p>
+                    </div>
+                  )}
+                  {result.contentAnalysis.isEmptyPage && (
+                    <div>
+                      <span className="text-gray-500">Empty Page</span>
+                      <p className="font-medium text-yellow-400">Yes — Very little content</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Content Snippet */}
+                {result.contentAnalysis.contentSnippet && (
+                  <div className="bg-black/20 rounded-lg p-3">
+                    <span className="text-gray-500 text-xs">Page Content Preview</span>
+                    <p className="text-xs text-gray-300 mt-1 line-clamp-3">{result.contentAnalysis.contentSnippet}</p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -344,48 +504,105 @@ export default function CheckUrlPage() {
             {result.complaintPath && result.riskScore > 30 && (
               <div className="mt-4 space-y-4">
                 <div className="bg-amber-500/15 border border-amber-500/30 rounded-lg p-4">
-                  <h3 className="text-sm font-semibold text-amber-300 mb-2">
-                    Complaint Path: {result.complaintPath.scamType}
+                  <h3 className="text-sm font-semibold text-amber-300 mb-1">
+                    📋 Complaint Guide: {result.complaintPath.scamType}
                   </h3>
-                  <p className="text-xs text-amber-400/70 mb-3">{result.complaintPath.scamTypeUrdu}</p>
+                  <p className="text-xs text-amber-300 mb-1">اردو: {result.complaintPath.scamTypeUrdu}</p>
+                  {result.complaintPath.scamTypeRomanUrdu && (
+                    <p className="text-xs text-amber-300/80 mb-3 italic">Roman Urdu: {result.complaintPath.scamTypeRomanUrdu}</p>
+                  )}
+
+                  {result.complaintPath.stepByStepGuide && result.complaintPath.stepByStepGuide.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="text-xs font-semibold text-green-300 mb-2">📝 Step-by-Step Complaint Guide:</h4>
+                      <ol className="list-decimal list-inside space-y-1">
+                        {result.complaintPath.stepByStepGuide.map((step, i) => (
+                          <li key={i} className="text-xs text-gray-300">{step}</li>
+                        ))}
+                      </ol>
+                      {result.complaintPath.stepByStepGuideRomanUrdu && result.complaintPath.stepByStepGuideRomanUrdu.length > 0 && (
+                        <div className="mt-2 bg-green-500/5 border border-green-500/20 rounded-lg p-2">
+                          <p className="text-xs font-semibold text-green-300 mb-1">Roman Urdu:</p>
+                          <ol className="list-decimal list-inside space-y-0.5">
+                            {result.complaintPath.stepByStepGuideRomanUrdu.map((step, i) => (
+                              <li key={i} className="text-xs text-gray-200">{step}</li>
+                            ))}
+                          </ol>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div className="mb-3">
-                    <h4 className="text-xs font-semibold text-amber-300 mb-1">Immediate Actions:</h4>
+                    <h4 className="text-xs font-semibold text-amber-300 mb-1">⚡ Immediate Actions:</h4>
                     <ol className="list-decimal list-inside space-y-1">
                       {result.complaintPath.immediateActions.map((action, i) => (
                         <li key={i} className="text-xs text-gray-300">{action}</li>
                       ))}
                     </ol>
+                    {result.complaintPath.immediateActionsRomanUrdu && result.complaintPath.immediateActionsRomanUrdu.length > 0 && (
+                      <div className="mt-2 bg-amber-500/5 border border-amber-500/10 rounded-lg p-2">
+                        <p className="text-xs font-semibold text-amber-300 mb-1">Roman Urdu:</p>
+                        <ol className="list-decimal list-inside space-y-0.5">
+                          {result.complaintPath.immediateActionsRomanUrdu.map((action, i) => (
+                            <li key={i} className="text-xs text-gray-200">{action}</li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mb-3">
-                    <h4 className="text-xs font-semibold text-amber-300 mb-1">Where to Complain:</h4>
+                    <h4 className="text-xs font-semibold text-amber-300 mb-1">🏛️ Where to Complain / شکایت کہاں کریں:</h4>
                     <div className="space-y-2">
                       {result.complaintPath.complaintContacts.map((contact, i) => (
                         <div key={i} className="bg-white/5 rounded-lg p-3 border border-amber-500/20">
                           <p className="text-xs font-semibold text-gray-100">{contact.name}</p>
+                          {contact.nameUrdu && <p className="text-xs text-gray-300" dir="rtl">{contact.nameUrdu}</p>}
                           <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
-                            <p className="text-xs text-gray-400">Phone: <span className="text-white font-medium">{contact.phone}</span></p>
-                            {contact.website && (
-                              <a
-                                href={contact.website}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-blue-400 hover:text-blue-300 hover:underline"
-                              >
-                                {contact.website.replace('https://', '').replace(/\/$/, '')} ↗
+                            <p className="text-xs text-gray-400">📞 <span className="text-white font-medium">{contact.phone}</span></p>
+                            {contact.website && contact.website.startsWith('http') ? (
+                              <a href={contact.website} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300 hover:underline">
+                                🌐 {contact.website.replace('https://', '').replace(/\/$/, '')} ↗
                               </a>
-                            )}
+                            ) : contact.website ? (
+                              <span className="text-xs text-gray-400">🌐 {contact.website}</span>
+                            ) : null}
                           </div>
-                          {contact.address && <p className="text-xs text-gray-500 mt-1">{contact.address}</p>}
+                          {contact.address && <p className="text-xs text-gray-500 mt-1">📍 {contact.address}</p>}
                           {contact.hours && <p className="text-xs text-gray-500 mt-0.5">⏰ {contact.hours}</p>}
                         </div>
                       ))}
                     </div>
                   </div>
 
+                  {result.complaintPath.evidenceChecklist && result.complaintPath.evidenceChecklist.length > 0 && (
+                    <div className="mb-3">
+                      <h4 className="text-xs font-semibold text-cyan-300 mb-2">🔐 Evidence Checklist / ثبوت کی فہرست:</h4>
+                      <ul className="space-y-1">
+                        {result.complaintPath.evidenceChecklist.map((item, i) => (
+                          <li key={i} className="text-xs text-gray-300 flex items-start gap-1">
+                            <span className="mt-0.5 text-cyan-400">☐</span> {item}
+                          </li>
+                        ))}
+                      </ul>
+                      {result.complaintPath.evidenceChecklistRomanUrdu && result.complaintPath.evidenceChecklistRomanUrdu.length > 0 && (
+                        <div className="mt-2 bg-cyan-500/5 border border-cyan-500/10 rounded-lg p-2">
+                          <p className="text-xs font-semibold text-cyan-300 mb-1">Roman Urdu:</p>
+                          <ul className="space-y-0.5">
+                            {result.complaintPath.evidenceChecklistRomanUrdu.map((item, i) => (
+                              <li key={i} className="text-xs text-gray-200 flex items-start gap-1">
+                                <span className="mt-0.5 text-cyan-300">☐</span> {item}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="mb-3">
-                    <h4 className="text-xs font-semibold text-amber-300 mb-1">Required Documents:</h4>
+                    <h4 className="text-xs font-semibold text-amber-300 mb-1">📄 Required Documents / ضروری دستاویزات:</h4>
                     <ul className="space-y-1">
                       {result.complaintPath.requiredDocuments.map((doc, i) => (
                         <li key={i} className="text-xs text-gray-300 flex items-start gap-1">
@@ -397,10 +614,13 @@ export default function CheckUrlPage() {
 
                   <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2 mb-3">
                     <p className="text-xs font-semibold text-amber-300">⏱ Timeframe: {result.complaintPath.timeframe}</p>
+                    {result.complaintPath.timeframeRomanUrdu && (
+                      <p className="text-xs text-amber-300/80 mt-1 italic">Roman Urdu: {result.complaintPath.timeframeRomanUrdu}</p>
+                    )}
                   </div>
 
                   <div className="mb-3">
-                    <h4 className="text-xs font-semibold text-amber-300 mb-1">Tips:</h4>
+                    <h4 className="text-xs font-semibold text-amber-300 mb-1">💡 Tips:</h4>
                     <ul className="space-y-1">
                       {result.complaintPath.additionalTips.map((tip, i) => (
                         <li key={i} className="text-xs text-gray-300 flex items-start gap-1">
@@ -408,15 +628,27 @@ export default function CheckUrlPage() {
                         </li>
                       ))}
                     </ul>
+                    {result.complaintPath.additionalTipsRomanUrdu && result.complaintPath.additionalTipsRomanUrdu.length > 0 && (
+                      <div className="mt-2 bg-amber-500/5 border border-amber-500/10 rounded-lg p-2">
+                        <p className="text-xs font-semibold text-amber-300 mb-1">Roman Urdu:</p>
+                        <ul className="space-y-0.5">
+                          {result.complaintPath.additionalTipsRomanUrdu.map((tip, i) => (
+                            <li key={i} className="text-xs text-gray-200 flex items-start gap-1">
+                              <span className="text-green-300 mt-0.5">✓</span> {tip}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
 
                   <a
                     href={result.complaintPath.onlineComplaintUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-block w-full text-center bg-amber-500 text-black text-xs font-semibold py-2 px-4 rounded-lg hover:bg-amber-400 transition-colors"
+                    className="inline-block w-full text-center bg-amber-500 text-black text-xs font-semibold py-2.5 px-4 rounded-lg hover:bg-amber-400 transition-colors"
                   >
-                    File Complaint Online →
+                    File Complaint Online / آن لائن شکایت درج کریں →
                   </a>
                 </div>
               </div>

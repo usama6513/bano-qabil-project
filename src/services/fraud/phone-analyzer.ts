@@ -1,3 +1,6 @@
+import { type ComplaintPath, getComplaintPathForType } from './complaint-paths';
+import { classifyWithAI } from './ai-fraud-classifier';
+
 export interface PhoneAnalysis {
   number: string;
   normalized: string;
@@ -33,11 +36,7 @@ export interface PhoneAnalysis {
     platforms: string[];
   };
   recommendation: string;
-  complaintPath?: {
-    authority: string;
-    helpline: string;
-    website: string;
-  };
+  complaintPath?: ComplaintPath;
   liveData?: {
     source: string;
     lineType: string;
@@ -47,6 +46,10 @@ export interface PhoneAnalysis {
     isVoIP: boolean;
     isRegistered: boolean;
     isRoaming: boolean;
+    truecallerName?: string;
+    truecallerSpamScore?: number;
+    truecallerType?: string;
+    truecallerVerified?: boolean;
   };
   analysisConfidence?: {
     level: 'high' | 'medium' | 'low';
@@ -362,23 +365,7 @@ const COUNTRIES: Record<string, CountryConfig> = {
   },
 };
 
-const KNOWN_SPAM_REPORTS: Record<string, { count: number; categories: string[] }> = {
-  // Demo/sample spam numbers for testing — in production, integrate with a real spam database
-  // such as Truecaller API, SpamCalls, or community-maintained spam lists
-  '03001234567': { count: 45, categories: ['SMS Phishing', 'Fake Prize'] },
-  '03211234567': { count: 32, categories: ['Call Fraud', 'Bank Scam'] },
-  '03451234567': { count: 28, categories: ['SMS Phishing', 'Account Verify'] },
-  '03011234567': { count: 15, categories: ['Job Scam'] },
-  '03331234567': { count: 22, categories: ['Romance Scam', 'Social Media'] },
-  '03101234567': { count: 18, categories: ['Lottery Scam'] },
-  '03701234567': { count: 12, categories: ['Crypto Scam'] },
-  '03501234567': { count: 8, categories: ['Fake E-commerce'] },
-  '09001234567': { count: 65, categories: ['Premium Rate Fraud', 'Subscription Trap'] },
-  '09002345678': { count: 48, categories: ['Premium Rate Fraud'] },
-  '+18001234567': { count: 55, categories: ['IRS Scam', 'Government Impersonation'] },
-  '+447911123456': { count: 38, categories: ['HMRC Scam', 'Tax Fraud'] },
-  '+917012345678': { count: 42, categories: ['KYC Scam', 'Bank Fraud'] },
-};
+// KNOWN_SPAM_REPORTS — REMOVED: AI classifies spam risk from real API evidence (Truecaller, etc.)
 
 function detectCountry(normalized: string): { country: CountryConfig | null; localNumber: string } {
   if (normalized.startsWith('+')) {
@@ -488,81 +475,17 @@ function detectRegion(country: CountryConfig, localNumber: string): PhoneAnalysi
   };
 }
 
-function analyzeScamPatterns(country: CountryConfig, localNumber: string): Array<{ type: 'warning' | 'danger'; label: string; value: string }> {
-  const indicators: Array<{ type: 'warning' | 'danger'; label: string; value: string }> = [];
+// analyzeScamPatterns — REMOVED: AI classifies risk from real evidence, not regex patterns
 
-  for (const prefix of country.scamPrefixes) {
-    if (localNumber.startsWith(prefix)) {
-      indicators.push({
-        type: 'danger',
-        label: 'Known Scam Pattern',
-        value: `Number matches ${prefix} prefix — common in fraud campaigns`,
-      });
-    }
-  }
+// checkSpamReports — REMOVED: AI uses real API data (Truecaller spam score) instead of hardcoded database
 
-  for (const prefix of country.premiumPrefixes) {
-    if (localNumber.startsWith(prefix)) {
-      indicators.push({
-        type: 'danger',
-        label: 'Premium Rate Number',
-        value: `This is a premium rate number — charges apply per call/SMS`,
-      });
-    }
-  }
+// calculateRiskScore — REMOVED: AI determines risk score from real evidence
 
-  return indicators;
-}
-
-function checkSpamReports(normalized: string): PhoneAnalysis['spamReports'] {
-  const report = KNOWN_SPAM_REPORTS[normalized];
-
-  if (report) {
-    return { reported: true, reportCount: report.count, categories: report.categories };
-  }
-
-  return { reported: false, reportCount: 0, categories: [] };
-}
-
-function calculateRiskScore(
-  isValid: boolean,
-  networkType: string,
-  scamPatterns: Array<{ type: string }>,
-  spamReports: PhoneAnalysis['spamReports'],
-  country: CountryConfig | null,
-): { score: number; level: PhoneAnalysis['riskLevel'] } {
-  let score = 0;
-
-  if (!isValid) score += 50;
-  if (networkType === 'unknown') score += 10;
-  if (!country) score += 20;
-
-  for (const pattern of scamPatterns) {
-    if (pattern.type === 'danger') score += 30;
-    else score += 15;
-  }
-
-  if (spamReports.reported) {
-    score += Math.min(spamReports.reportCount * 2, 40);
-  }
-
-  score = Math.min(score, 100);
-
-  let level: PhoneAnalysis['riskLevel'] = 'safe';
-  if (score >= 80) level = 'critical';
-  else if (score >= 60) level = 'high';
-  else if (score >= 40) level = 'medium';
-  else if (score >= 20) level = 'low';
-
-  return { score, level };
-}
-
-export function analyzePhoneNumber(input: string, liveData?: import('./phone-lookup').LivePhoneData | null): PhoneAnalysis {
+export async function analyzePhoneNumber(input: string, liveData?: import('./phone-lookup').LivePhoneData | null): Promise<PhoneAnalysis> {
   const normalized = normalizeNumber(input);
   const { country, localNumber } = detectCountry(normalized);
 
   if (!country) {
-    const { score, level } = calculateRiskScore(false, 'unknown', [], { reported: false, reportCount: 0, categories: [] }, null);
     return {
       number: input,
       normalized,
@@ -572,8 +495,8 @@ export function analyzePhoneNumber(input: string, liveData?: import('./phone-loo
       countryEmoji: '🌍',
       network: { name: 'Unknown', mcc: '000', mnc: '000', type: 'unknown' },
       region: { province: 'Unknown', city: 'Unknown', areaCode: '' },
-      riskScore: score,
-      riskLevel: level,
+      riskScore: 50,
+      riskLevel: 'medium',
       indicators: [
         { type: 'danger', label: 'Country', value: 'Unable to identify country from number' },
         { type: 'warning', label: 'Format', value: 'Number format not recognized' },
@@ -587,8 +510,6 @@ export function analyzePhoneNumber(input: string, liveData?: import('./phone-loo
   const isValid = country.dialFormat.test(localNumber);
   const network = detectNetwork(country, localNumber);
   const region = detectRegion(country, localNumber);
-  const scamPatterns = analyzeScamPatterns(country, localNumber);
-  const spamReports = checkSpamReports(normalized);
 
   let finalNetwork = network;
   let finalRegion = region;
@@ -617,11 +538,31 @@ export function analyzePhoneNumber(input: string, liveData?: import('./phone-loo
     if (liveData.isRoaming) {
       extraIndicators.push({ type: 'warning', label: 'Roaming', value: 'Number is currently roaming — location may be different from registration' });
     }
+    // Truecaller indicators
+    if (liveData.truecallerName) {
+      extraIndicators.push({
+        type: 'info',
+        label: 'Owner Name (Truecaller)',
+        value: liveData.truecallerVerified
+          ? `${liveData.truecallerName} \u2713 Verified`
+          : liveData.truecallerName,
+      });
+    }
+    if (liveData.truecallerSpamScore !== undefined && liveData.truecallerSpamScore > 0) {
+      const spamSeverity = liveData.truecallerSpamScore >= 50 ? 'danger' : liveData.truecallerSpamScore >= 20 ? 'warning' : 'warning';
+      extraIndicators.push({
+        type: spamSeverity,
+        label: 'Truecaller Spam Score',
+        value: `${liveData.truecallerSpamScore}/100 \u2014 ${liveData.truecallerSpamScore >= 50 ? 'HIGH spam risk' : liveData.truecallerSpamScore >= 20 ? 'moderate spam reports' : 'low spam reports'}`,
+      });
+    }
+    if (liveData.truecallerType) {
+      extraIndicators.push({ type: 'info', label: 'Truecaller Type', value: liveData.truecallerType });
+    }
     extraIndicators.push({ type: 'info', label: 'Data Source', value: `Live data from ${liveData.source}` });
   }
 
-  const { score: riskScore, level: riskLevel } = calculateRiskScore(finalValid, finalNetwork.type, scamPatterns, spamReports, country);
-
+  // Build factual indicators
   const indicators: PhoneAnalysis['indicators'] = [
     { type: 'info', label: 'Country', value: `${country.emoji} ${country.name} (${country.code})` },
     { type: 'info', label: 'Network', value: finalNetwork.name + (liveData ? ' (verified)' : ' (prefix-based)') },
@@ -637,118 +578,97 @@ export function analyzePhoneNumber(input: string, liveData?: import('./phone-loo
     indicators.push({ type: 'warning', label: 'Network', value: 'Network not recognized' });
   }
 
-  for (const pattern of scamPatterns) {
-    indicators.push({ type: pattern.type, label: pattern.label, value: pattern.value });
+  if (finalNetwork.type === 'landline' && !liveData) {
+    indicators.push({ type: 'warning', label: 'Unverified Landline', value: 'Landline number could not be verified via live lookup — exercise caution' });
   }
 
-  if (spamReports.reported) {
-    indicators.push({
-      type: 'danger',
-      label: 'Spam Reports',
-      value: `${spamReports.reportCount} reports — ${spamReports.categories.join(', ')}`,
-    });
+  // Check for premium rate number (factual, not classification)
+  for (const prefix of country.premiumPrefixes) {
+    if (localNumber.startsWith(prefix)) {
+      indicators.push({ type: 'danger', label: 'Premium Rate Number', value: `This is a premium rate number — charges apply per call/SMS` });
+    }
   }
 
   indicators.push(...extraIndicators);
 
-  // Build verification platforms based on actual live data
-  const platforms: string[] = [];
-  if (liveData?.isWhatsApp) {
-    platforms.push('WhatsApp (verified active)');
-  }
-  if (liveData) {
-    platforms.push(`Carrier: ${liveData.carrier} (${liveData.source})`);
-  }
-  platforms.push('Google (search the number)');
-  platforms.push('Truecaller');
-
-  const socialPresence = {
-    possible: platforms.length > 0,
-    platforms,
+  // AI CLASSIFICATION — AI is the sole judge for scam determination
+  const evidence: Record<string, unknown> = {
+    phoneNumber: input,
+    normalizedNumber: normalized,
+    country: country.name,
+    network: finalNetwork.name,
+    networkType: finalNetwork.type,
+    region: finalRegion.city,
+    isValid: finalValid,
   };
-
-  let recommendation = '';
-  if (riskLevel === 'critical') {
-    recommendation = `HIGH RISK: This ${country.name} number has been flagged. Do NOT engage. Block and report to ${country.complaintAuthority}.`;
-  } else if (riskLevel === 'high') {
-    recommendation = `SUSPICIOUS: This ${country.name} number shows red flags. Verify the sender before responding.`;
-  } else if (riskLevel === 'medium') {
-    recommendation = `CAUTION: Some indicators suggest caution. Verify the sender identity before sharing personal information.`;
-  } else if (riskLevel === 'low') {
-    recommendation = 'LOW RISK: This number appears to be from a known network. Standard precautions apply.';
-  } else {
-    recommendation = `This ${country.name} number appears safe based on available data. Standard precautions apply — never share OTPs or PINs.`;
-  }
-
-  let complaintPath: PhoneAnalysis['complaintPath'] | undefined;
-  if ((riskLevel === 'high' || riskLevel === 'critical') && country.complaintAuthority) {
-    complaintPath = {
-      authority: country.complaintAuthority,
-      helpline: country.complaintHelpline || 'N/A',
-      website: country.complaintWebsite || '',
+  if (liveData) {
+    evidence.liveData = {
+      carrier: liveData.carrier,
+      lineType: liveData.lineType,
+      location: liveData.location,
+      isWhatsApp: liveData.isWhatsApp,
+      isVoIP: liveData.isVoIP,
+      isRoaming: liveData.isRoaming,
+      truecallerName: liveData.truecallerName,
+      truecallerSpamScore: liveData.truecallerSpamScore,
+      truecallerType: liveData.truecallerType,
+      truecallerVerified: liveData.truecallerVerified,
     };
   }
 
-  // Calculate analysis confidence
+  const aiVerdict = await classifyWithAI({
+    contentType: 'phone',
+    content: input,
+    evidence,
+  });
+
+  const riskScore = aiVerdict.riskScore;
+  const riskLevel = aiVerdict.riskLevel;
+
+  // Build verification platforms
+  const platforms: string[] = [];
+  if (liveData?.isWhatsApp) platforms.push('WhatsApp (verified active)');
+  if (liveData) platforms.push(`Carrier: ${liveData.carrier} (${liveData.source})`);
+  platforms.push('Google (search the number)');
+  platforms.push('Truecaller');
+
+  const socialPresence = { possible: platforms.length > 0, platforms };
+
+  // Build recommendation from AI verdict
+  const recommendation = aiVerdict.recommendedActionsRomanUrdu?.[0] || (
+    riskLevel === 'critical' ? `HIGH RISK: This ${country.name} number has been flagged. Do NOT engage. Block and report to ${country.complaintAuthority}.`
+    : riskLevel === 'high' ? `SUSPICIOUS: This ${country.name} number shows red flags. Verify the sender before responding.`
+    : riskLevel === 'medium' ? `CAUTION: Some indicators suggest caution. Verify the sender identity before sharing personal information.`
+    : `This ${country.name} number appears safe based on available data. Standard precautions apply — never share OTPs or PINs.`
+  );
+
+  // Complaint path from AI-determined scam type
+  let complaintPath: PhoneAnalysis['complaintPath'] | undefined;
+  if ((riskLevel === 'medium' || riskLevel === 'high' || riskLevel === 'critical') && country.complaintAuthority) {
+    complaintPath = getComplaintPathForType(aiVerdict.scamType) || getComplaintPathForType('Generic Scam');
+  }
+
+  // Analysis confidence
   const confidenceFactors: string[] = [];
   let confidenceScore = 0;
-
-  if (finalValid) {
-    confidenceScore += 25;
-    confidenceFactors.push('Valid number format');
-  }
+  if (finalValid) { confidenceScore += 25; confidenceFactors.push('Valid number format'); }
   if (liveData) {
-    confidenceScore += 30;
-    confidenceFactors.push('Live data verified');
-    if (liveData.carrier && liveData.carrier !== 'Unknown') {
-      confidenceScore += 20;
-      confidenceFactors.push('Carrier confirmed');
-    }
-    if (liveData.isRegistered) {
-      confidenceScore += 10;
-      confidenceFactors.push('Number is registered');
-    }
+    confidenceScore += 30; confidenceFactors.push('Live data verified');
+    if (liveData.carrier && liveData.carrier !== 'Unknown') { confidenceScore += 20; confidenceFactors.push('Carrier confirmed'); }
+    if (liveData.isRegistered) { confidenceScore += 10; confidenceFactors.push('Number is registered'); }
   } else {
-    confidenceScore += 15;
-    confidenceFactors.push('Prefix-based detection only');
+    confidenceScore += 15; confidenceFactors.push('Prefix-based detection only');
   }
-  if (finalNetwork.name !== 'Unknown') {
-    confidenceScore += 15;
-    confidenceFactors.push('Network identified');
-  }
-  if (!spamReports.reported) {
-    confidenceScore += 10;
-    confidenceFactors.push('No spam reports');
-  }
-  if (scamPatterns.length === 0) {
-    confidenceScore += 10;
-    confidenceFactors.push('No scam patterns detected');
-  }
-
+  if (finalNetwork.name !== 'Unknown') { confidenceScore += 15; confidenceFactors.push('Network identified'); }
   const confidenceLevel = confidenceScore >= 80 ? 'high' : confidenceScore >= 50 ? 'medium' : 'low';
 
-  // Detailed analysis
   const isLandline = input.startsWith('0') && !input.startsWith('03');
   const detailedAnalysis = {
-    numberValidity: finalValid
-      ? `✅ Number format is valid for ${country.name}`
-      : `❌ Number format is invalid for ${country.name}`,
-    networkReliability: liveData?.carrier && liveData.carrier !== 'Unknown'
-      ? `✅ Network confirmed via live lookup: ${liveData.carrier}`
-      : `⚠️ Network detected via prefix matching: ${finalNetwork.name} (may be ported)`,
-    locationInfo: isLandline
-      ? `✅ Landline registered in: ${finalRegion.city}`
-      : `ℹ️ Mobile number — registered nationwide (not tied to specific city)`,
-    riskAssessment: riskLevel === 'safe' || riskLevel === 'low'
-      ? `✅ Low risk score (${riskScore}/100) — appears safe`
-      : riskLevel === 'medium'
-      ? `⚠️ Medium risk score (${riskScore}/100) — exercise caution`
-      : `❌ High risk score (${riskScore}/100) — suspicious activity detected`,
-    recommendation: riskLevel === 'safe' || riskLevel === 'low'
-      ? 'This number appears safe. Standard precautions apply — never share OTPs or personal information.'
-      : riskLevel === 'medium'
-      ? 'Verify the sender identity before sharing any personal information.'
-      : 'Do NOT engage with this number. Block and report if suspicious.',
+    numberValidity: finalValid ? `✅ Number format is valid for ${country.name}` : `❌ Number format is invalid for ${country.name}`,
+    networkReliability: liveData?.carrier && liveData.carrier !== 'Unknown' ? `✅ Network confirmed via live lookup: ${liveData.carrier}` : `⚠️ Network detected via prefix matching: ${finalNetwork.name} (may be ported)`,
+    locationInfo: isLandline ? `✅ Landline registered in: ${finalRegion.city}` : `ℹ️ Mobile number — registered nationwide (not tied to specific city)`,
+    riskAssessment: riskLevel === 'safe' || riskLevel === 'low' ? `✅ Low risk score (${riskScore}/100) — appears safe` : riskLevel === 'medium' ? `⚠️ Medium risk score (${riskScore}/100) — exercise caution` : `❌ High risk score (${riskScore}/100) — suspicious activity detected`,
+    recommendation: riskLevel === 'safe' || riskLevel === 'low' ? 'This number appears safe. Standard precautions apply — never share OTPs or personal information.' : riskLevel === 'medium' ? 'Verify the sender identity before sharing any personal information.' : 'Do NOT engage with this number. Block and report if suspicious.',
   };
 
   return {
@@ -763,25 +683,18 @@ export function analyzePhoneNumber(input: string, liveData?: import('./phone-loo
     riskScore,
     riskLevel,
     indicators,
-    spamReports,
+    spamReports: { reported: false, reportCount: 0, categories: [] },
     socialPresence,
     recommendation,
     complaintPath,
-    analysisConfidence: {
-      level: confidenceLevel,
-      percentage: Math.min(confidenceScore, 100),
-      factors: confidenceFactors,
-    },
+    analysisConfidence: { level: confidenceLevel, percentage: Math.min(confidenceScore, 100), factors: confidenceFactors },
     detailedAnalysis,
     liveData: liveData ? {
-      source: liveData.source,
-      lineType: liveData.lineType,
-      carrier: liveData.carrier,
-      location: liveData.location,
-      isWhatsApp: liveData.isWhatsApp,
-      isVoIP: liveData.isVoIP,
-      isRegistered: liveData.isRegistered,
-      isRoaming: liveData.isRoaming,
+      source: liveData.source, lineType: liveData.lineType, carrier: liveData.carrier,
+      location: liveData.location, isWhatsApp: liveData.isWhatsApp, isVoIP: liveData.isVoIP,
+      isRegistered: liveData.isRegistered, isRoaming: liveData.isRoaming,
+      truecallerName: liveData.truecallerName, truecallerSpamScore: liveData.truecallerSpamScore,
+      truecallerType: liveData.truecallerType, truecallerVerified: liveData.truecallerVerified,
     } : undefined,
   };
 }

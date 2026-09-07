@@ -38,9 +38,29 @@ interface PhoneAnalysis {
   };
   recommendation: string;
   complaintPath?: {
-    authority: string;
-    helpline: string;
-    website: string;
+    scamType: string;
+    scamTypeUrdu: string;
+    scamTypeRomanUrdu?: string;
+    immediateActions: string[];
+    immediateActionsUrdu?: string[];
+    immediateActionsRomanUrdu?: string[];
+    complaintContacts: { name: string; nameUrdu?: string; nameRomanUrdu?: string; phone: string; website: string; address?: string; addressUrdu?: string; addressRomanUrdu?: string; hours?: string; hoursUrdu?: string; hoursRomanUrdu?: string }[];
+    requiredDocuments: string[];
+    requiredDocumentsUrdu?: string[];
+    requiredDocumentsRomanUrdu?: string[];
+    onlineComplaintUrl: string;
+    timeframe: string;
+    timeframeUrdu?: string;
+    timeframeRomanUrdu?: string;
+    additionalTips: string[];
+    additionalTipsUrdu?: string[];
+    additionalTipsRomanUrdu?: string[];
+    evidenceChecklist?: string[];
+    evidenceChecklistUrdu?: string[];
+    evidenceChecklistRomanUrdu?: string[];
+    stepByStepGuide?: string[];
+    stepByStepGuideUrdu?: string[];
+    stepByStepGuideRomanUrdu?: string[];
   };
   liveData?: {
     source: string;
@@ -51,6 +71,10 @@ interface PhoneAnalysis {
     isVoIP: boolean;
     isRegistered: boolean;
     isRoaming: boolean;
+    truecallerName?: string;
+    truecallerSpamScore?: number;
+    truecallerType?: string;
+    truecallerVerified?: boolean;
   };
   analysisConfidence?: {
     level: 'high' | 'medium' | 'low';
@@ -319,6 +343,36 @@ export default function CheckPhonePage() {
             </div>
           )}
 
+          {/* Registered Owner Name - Prominent Display */}
+          {result.liveData?.truecallerName && (
+            <div className="card p-5 border border-blue-500/30 bg-gradient-to-r from-blue-500/5 to-indigo-500/5">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center text-2xl">
+                  👤
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-gray-400 uppercase tracking-wide">Registered Owner</p>
+                  <p className="text-xl font-bold text-gray-100">
+                    {result.liveData.truecallerName}
+                    {result.liveData.truecallerVerified && (
+                      <span className="ml-2 text-sm text-green-400">✓ Verified</span>
+                    )}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">Identified via {result.liveData.source || 'Truecaller'}</p>
+                </div>
+                {result.liveData.truecallerSpamScore !== undefined && result.liveData.truecallerSpamScore > 0 && (
+                  <div className={`px-3 py-1.5 rounded-full text-xs font-bold ${
+                    result.liveData.truecallerSpamScore >= 50 ? 'bg-red-500/20 text-red-400' :
+                    result.liveData.truecallerSpamScore >= 20 ? 'bg-yellow-500/20 text-yellow-400' :
+                    'bg-green-500/20 text-green-400'
+                  }`}>
+                    Spam: {result.liveData.truecallerSpamScore}/100
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="card text-center">
               <p className="text-xs text-gray-500 mb-1">Country</p>
@@ -370,13 +424,189 @@ export default function CheckPhonePage() {
             </div>
           </div>
 
-          {result.complaintPath && (
-            <div className="bg-red-500/10 rounded-xl p-4 border border-red-500/30">
-              <h4 className="font-semibold text-red-300 mb-2">How to Report This Number</h4>
-              <div className="text-sm text-gray-300 space-y-1">
-                <p><strong>Authority:</strong> {result.complaintPath.authority}</p>
-                <p><strong>Helpline:</strong> {result.complaintPath.helpline}</p>
-                <p><strong>Website:</strong> {result.complaintPath.website}</p>
+          {result.complaintPath && result.riskScore > 30 && (
+            <div className="mt-4 space-y-4">
+              <div className="bg-amber-500/15 border border-amber-500/30 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-amber-300 mb-1">
+                  📋 Complaint Guide: {result.complaintPath.scamType}
+                </h3>
+                <p className="text-xs text-amber-300 mb-1">اردو: {result.complaintPath.scamTypeUrdu}</p>
+                {result.complaintPath.scamTypeRomanUrdu && (
+                  <p className="text-xs text-amber-300/80 mb-3 italic">Roman Urdu: {result.complaintPath.scamTypeRomanUrdu}</p>
+                )}
+
+                {/* Step-by-Step Guide */}
+                {result.complaintPath.stepByStepGuide && result.complaintPath.stepByStepGuide.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-xs font-semibold text-green-300 mb-2">📝 Step-by-Step Complaint Guide:</h4>
+                    <ol className="list-decimal list-inside space-y-1">
+                      {result.complaintPath.stepByStepGuide.map((step, i) => (
+                        <li key={i} className="text-xs text-gray-300">{step}</li>
+                      ))}
+                    </ol>
+                    {result.complaintPath.stepByStepGuideRomanUrdu && result.complaintPath.stepByStepGuideRomanUrdu.length > 0 && (
+                      <div className="mt-2 bg-green-500/5 border border-green-500/20 rounded-lg p-2">
+                        <p className="text-xs font-semibold text-green-300 mb-1">Roman Urdu:</p>
+                        <ol className="list-decimal list-inside space-y-0.5">
+                          {result.complaintPath.stepByStepGuideRomanUrdu.map((step, i) => (
+                            <li key={i} className="text-xs text-gray-200">{step}</li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+                    {result.complaintPath.stepByStepGuideUrdu && result.complaintPath.stepByStepGuideUrdu.length > 0 && (
+                      <div className="mt-2 bg-green-500/5 border border-green-500/20 rounded-lg p-2" dir="rtl">
+                        <p className="text-xs font-semibold text-green-300 mb-1">اردو:</p>
+                        <ol className="list-decimal list-inside space-y-0.5 text-right">
+                          {result.complaintPath.stepByStepGuideUrdu.map((step, i) => (
+                            <li key={i} className="text-xs text-gray-200">{step}</li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Immediate Actions */}
+                <div className="mb-3">
+                  <h4 className="text-xs font-semibold text-amber-300 mb-1">⚡ Immediate Actions:</h4>
+                  <ol className="list-decimal list-inside space-y-1">
+                    {result.complaintPath.immediateActions.map((action, i) => (
+                      <li key={i} className="text-xs text-gray-300">{action}</li>
+                    ))}
+                  </ol>
+                  {result.complaintPath.immediateActionsRomanUrdu && result.complaintPath.immediateActionsRomanUrdu.length > 0 && (
+                    <div className="mt-2 bg-amber-500/5 border border-amber-500/10 rounded-lg p-2">
+                      <p className="text-xs font-semibold text-amber-300 mb-1">Roman Urdu:</p>
+                      <ol className="list-decimal list-inside space-y-0.5">
+                        {result.complaintPath.immediateActionsRomanUrdu.map((action, i) => (
+                          <li key={i} className="text-xs text-gray-200">{action}</li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+                </div>
+
+                {/* Where to Complain */}
+                <div className="mb-3">
+                  <h4 className="text-xs font-semibold text-amber-300 mb-1">🏛️ Where to Complain / شکایت کہاں کریں:</h4>
+                  <div className="space-y-2">
+                    {result.complaintPath.complaintContacts.map((contact, i) => (
+                      <div key={i} className="bg-white/5 rounded-lg p-3 border border-amber-500/20">
+                        <p className="text-xs font-semibold text-gray-100">{contact.name}</p>
+                        {contact.nameUrdu && <p className="text-xs text-gray-300" dir="rtl">{contact.nameUrdu}</p>}
+                        {contact.nameRomanUrdu && <p className="text-xs text-gray-300 italic">{contact.nameRomanUrdu}</p>}
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+                          <p className="text-xs text-gray-400">📞 <span className="text-white font-medium">{contact.phone}</span></p>
+                          {contact.website && contact.website.startsWith('http') ? (
+                            <a href={contact.website} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300 hover:underline">
+                              🌐 {contact.website.replace('https://', '').replace(/\/$/, '')} ↗
+                            </a>
+                          ) : contact.website ? (
+                            <span className="text-xs text-gray-400">🌐 {contact.website}</span>
+                          ) : null}
+                        </div>
+                        {contact.address && <p className="text-xs text-gray-500 mt-1">📍 {contact.address}</p>}
+                        {contact.hours && <p className="text-xs text-gray-500 mt-0.5">⏰ {contact.hours}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Evidence Checklist */}
+                {result.complaintPath.evidenceChecklist && result.complaintPath.evidenceChecklist.length > 0 && (
+                  <div className="mb-3">
+                    <h4 className="text-xs font-semibold text-cyan-300 mb-2">🔐 Evidence Checklist for Complaint / شکایت کے لیے ثبوت:</h4>
+                    <ul className="space-y-1">
+                      {result.complaintPath.evidenceChecklist.map((item, i) => (
+                        <li key={i} className="text-xs text-gray-300 flex items-start gap-1">
+                          <span className="mt-0.5 text-cyan-400">☐</span> {item}
+                        </li>
+                      ))}
+                    </ul>
+                    {result.complaintPath.evidenceChecklistRomanUrdu && result.complaintPath.evidenceChecklistRomanUrdu.length > 0 && (
+                      <div className="mt-2 bg-cyan-500/5 border border-cyan-500/10 rounded-lg p-2">
+                        <p className="text-xs font-semibold text-cyan-300 mb-1">Roman Urdu:</p>
+                        <ul className="space-y-0.5">
+                          {result.complaintPath.evidenceChecklistRomanUrdu.map((item, i) => (
+                            <li key={i} className="text-xs text-gray-200 flex items-start gap-1">
+                              <span className="mt-0.5 text-cyan-300">☐</span> {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {result.complaintPath.evidenceChecklistUrdu && result.complaintPath.evidenceChecklistUrdu.length > 0 && (
+                      <div className="mt-2 bg-cyan-500/5 border border-cyan-500/10 rounded-lg p-2" dir="rtl">
+                        <p className="text-xs font-semibold text-cyan-300 mb-1 text-right">اردو:</p>
+                        <ul className="space-y-0.5 text-right">
+                          {result.complaintPath.evidenceChecklistUrdu.map((item, i) => (
+                            <li key={i} className="text-xs text-gray-200 flex items-start gap-1 flex-row-reverse">
+                              <span className="mt-0.5 text-cyan-300">☐</span> {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Required Documents */}
+                <div className="mb-3">
+                  <h4 className="text-xs font-semibold text-amber-300 mb-1">📄 Required Documents / ضروری دستاویزات:</h4>
+                  <ul className="space-y-1">
+                    {result.complaintPath.requiredDocuments.map((doc, i) => (
+                      <li key={i} className="text-xs text-gray-300 flex items-start gap-1">
+                        <span className="mt-0.5">•</span> {doc}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Timeframe */}
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2 mb-3">
+                  <p className="text-xs font-semibold text-amber-300">⏱ Timeframe: {result.complaintPath.timeframe}</p>
+                  {result.complaintPath.timeframeRomanUrdu && (
+                    <p className="text-xs text-amber-300/80 mt-1 italic">Roman Urdu: {result.complaintPath.timeframeRomanUrdu}</p>
+                  )}
+                  {result.complaintPath.timeframeUrdu && (
+                    <p className="text-xs text-amber-300/80 mt-1" dir="rtl">{result.complaintPath.timeframeUrdu}</p>
+                  )}
+                </div>
+
+                {/* Tips */}
+                <div className="mb-3">
+                  <h4 className="text-xs font-semibold text-amber-300 mb-1">💡 Tips / مشورے:</h4>
+                  <ul className="space-y-1">
+                    {result.complaintPath.additionalTips.map((tip, i) => (
+                      <li key={i} className="text-xs text-gray-300 flex items-start gap-1">
+                        <span className="text-green-400 mt-0.5">✓</span> {tip}
+                      </li>
+                    ))}
+                  </ul>
+                  {result.complaintPath.additionalTipsRomanUrdu && result.complaintPath.additionalTipsRomanUrdu.length > 0 && (
+                    <div className="mt-2 bg-amber-500/5 border border-amber-500/10 rounded-lg p-2">
+                      <p className="text-xs font-semibold text-amber-300 mb-1">Roman Urdu:</p>
+                      <ul className="space-y-0.5">
+                        {result.complaintPath.additionalTipsRomanUrdu.map((tip, i) => (
+                          <li key={i} className="text-xs text-gray-200 flex items-start gap-1">
+                            <span className="text-green-300 mt-0.5">✓</span> {tip}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* Online Complaint Button */}
+                <a
+                  href={result.complaintPath.onlineComplaintUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block w-full text-center bg-amber-500 text-black text-xs font-semibold py-2.5 px-4 rounded-lg hover:bg-amber-400 transition-colors"
+                >
+                  File Complaint Online / آن لائن شکایت درج کریں →
+                </a>
               </div>
             </div>
           )}
@@ -407,6 +637,17 @@ export default function CheckPhonePage() {
                 {result.liveData.isVoIP && ' | ⚠ VoIP number'}
                 {result.liveData.isRoaming && ' | ⚠ Roaming'}
               </p>
+              {result.liveData.truecallerName && (
+                <p className="text-sm text-blue-300 mt-1">
+                  👤 Registered to: <strong>{result.liveData.truecallerName}</strong>
+                  {result.liveData.truecallerVerified && ' ✓ Verified'}
+                </p>
+              )}
+              {!result.liveData.truecallerName && (
+                <p className="text-xs text-gray-400 mt-1">
+                  ℹ️ Owner name not found. Configure <code className="bg-white/10 px-1 rounded">TRUECALLER_API_KEY</code> in environment to enable name lookup.
+                </p>
+              )}
             </div>
           ) : (
             <div className="bg-yellow-500/10 rounded-xl p-4 border border-yellow-500/30">
@@ -417,6 +658,9 @@ export default function CheckPhonePage() {
               <p className="text-sm text-gray-300">
                 Live verification unavailable. Results are based on number format and prefix analysis only.
                 Network detection is prefix-based and may not reflect number portability.
+              </p>
+              <p className="text-xs text-yellow-400/70 mt-2">
+                💡 Owner name lookup requires Truecaller API. Configure <code className="bg-white/10 px-1 rounded">TRUECALLER_API_KEY</code> to see registered name.
               </p>
             </div>
           )}

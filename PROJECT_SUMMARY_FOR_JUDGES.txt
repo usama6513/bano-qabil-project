@@ -1,0 +1,11 @@
+EDUGUARD AI - Summary
+Pakistan's First All-in-One Education, Finance & Security Platform for All Students
+Live: eduguard-ai-steel.vercel.app
+
+EduGuard AI is a full-stack AI platform for Pakistani students combining education guidance, financial intelligence, fraud protection, and career planning into one complete free system.
+
+Built on Next.js 14, TypeScript, PostgreSQL (Neon), Prisma ORM with 77 data models. AI uses Groq with automatic Gemini fallback for zero downtime. Six specialized AI agents: EduAdvisor (university guidance with exact merit data), ScholarshipGuru (64 scholarships matched by eligibility), InternshipExpert (29 opportunities and career roadmaps), BudgetPro (expense tracking with health scores), FinanceAdvisor (FBR tax, banking, Islamic finance, PSX), FraudGuard (URL, phone, document scanning with risk scoring and evidence-based explanations).
+
+Database: 351 universities, 6,151 courses, 64 scholarships, 29 internships, 66 career paths, 25 country profiles, 16 CM programs, 23 government schemes. Key modules include: Education Center with study abroad, Finance dashboard with smart insights, Fraud Detection with 5 scanning tools, Study Planner with AI diagnostics, Teacher Module, Student Assistant with privacy-filtered context.
+
+Security: JWT auth, bcrypt, rate limiting, Zod validation, prompt injection defense, credential redaction. Supports English, Roman Urdu, Urdu with full voice input. Hosted on Vercel, 154 API routes, 1010+ tests. Free forever, no paywall.

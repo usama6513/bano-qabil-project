@@ -233,7 +233,8 @@ export class RecommendationService {
     }
 
     if (profile.city) {
-      where.city = { contains: profile.city };
+      // More flexible city matching - case insensitive
+      where.city = { contains: profile.city, mode: 'insensitive' };
     }
 
     const courseFilters: Prisma.CourseWhereInput[] = [];
@@ -250,22 +251,23 @@ export class RecommendationService {
 
     if (profile.degreeLevel) {
       const resolved = resolveDegreeLevel(profile.degreeLevel);
-      const degreeFilter: Prisma.CourseWhereInput = { degree: { equals: resolved.dbValue } };
+      // More flexible degree matching - include variations
+      const degreeVariations = ['bachelor', 'bs', 'ba', 'bsc', 'bcom'];
+      if (resolved.dbValue === 'bachelor') {
+        courseFilters.push({
+          OR: degreeVariations.map(dv => ({ degree: { equals: dv, mode: 'insensitive' } }))
+        });
+      } else {
+        courseFilters.push({ degree: { equals: resolved.dbValue } });
+      }
       // For professional degrees, also filter by course name/department
       if (resolved.searchTerms) {
         courseFilters.push({
-          AND: [
-            degreeFilter,
-            {
-              OR: [
-                ...resolved.searchTerms.map(term => ({ name: { contains: term, mode: 'insensitive' as const } })),
-                ...resolved.searchTerms.map(term => ({ department: { contains: term, mode: 'insensitive' as const } })),
-              ],
-            },
+          OR: [
+            ...resolved.searchTerms.map(term => ({ name: { contains: term, mode: 'insensitive' as const } })),
+            ...resolved.searchTerms.map(term => ({ department: { contains: term, mode: 'insensitive' as const } })),
           ],
         });
-      } else {
-        courseFilters.push(degreeFilter);
       }
     }
 
@@ -273,7 +275,7 @@ export class RecommendationService {
       where.courses = { some: { AND: courseFilters } };
     }
 
-    const results = await prisma.university.findMany({
+    let results = await prisma.university.findMany({
       where,
       include: {
         courses: {
@@ -285,7 +287,7 @@ export class RecommendationService {
             currency: true,
             description: true,
           },
-          take: 20, // Increased from 10 to 20
+          take: 20,
         },
         departments: {
           select: {
@@ -298,6 +300,41 @@ export class RecommendationService {
       take: 20,
       orderBy: [{ ranking: 'asc' }, { name: 'asc' }],
     });
+
+    // Fallback: If no results found, try with relaxed filters
+    if (results.length === 0 && (profile.city || profile.budget)) {
+      const relaxedWhere: Prisma.UniversityWhereInput = {};
+      if (profile.country) relaxedWhere.country = profile.country;
+      // Remove city filter for fallback
+      if (courseFilters.length > 0) {
+        relaxedWhere.courses = { some: { AND: courseFilters } };
+      }
+      results = await prisma.university.findMany({
+        where: relaxedWhere,
+        include: {
+          courses: {
+            select: {
+              name: true,
+              degree: true,
+              department: true,
+              tuitionFee: true,
+              currency: true,
+              description: true,
+            },
+            take: 20,
+          },
+          departments: {
+            select: {
+              name: true,
+              totalCourses: true,
+            },
+            take: 15,
+          },
+        },
+        take: 20,
+        orderBy: [{ ranking: 'asc' }, { name: 'asc' }],
+      });
+    }
 
     return results.map((uni) => {
       const matchScore = this.scoreUniversity(uni, profile);

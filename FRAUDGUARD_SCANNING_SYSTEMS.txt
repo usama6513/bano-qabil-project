@@ -1,0 +1,853 @@
+================================================================================
+                    EDUGUARD AI - FRAUDGUARD SCANNING SYSTEMS
+                         Complete Technical Documentation
+================================================================================
+
+Project: EduGuard AI - FraudGuard Feature
+Production: https://eduguard-ai-steel.vercel.app
+Source Path: src/services/fraud/
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+
+1. URL SCANNING SYSTEM
+2. PHONE NUMBER SCANNING SYSTEM
+3. DOCUMENT SCANNING SYSTEM
+4. TEXT/SMS/MESSAGE SCANNING SYSTEM
+5. EMAIL SCANNING SYSTEM
+6. SCREENSHOT/IMAGE SCANNING SYSTEM
+7. USSD CODE SCANNING SYSTEM
+8. RISK SCORING ENGINE
+9. AI EXPLANATION SYSTEM
+10. COMPLAINT PATHS & REPORTING
+11. SCAM KNOWLEDGE BASE
+12. SUPPORTED COUNTRIES & AUTHORITIES
+
+================================================================================
+1. URL SCANNING SYSTEM
+================================================================================
+
+File: src/services/fraud/url-analyzer.ts (1641 lines)
+API Routes: 
+  - /api/fraud/scan/url
+  - /api/urls/scan
+
+DESCRIPTION:
+The URL scanner performs a comprehensive multi-stage pipeline analysis to detect
+phishing sites, scam URLs, malicious domains, and fraudulent web pages.
+
+PIPELINE STAGES (in order):
+────────────────────────────
+
+1. URL NORMALIZATION & PARSING
+   - Parses URL into domain, subdomain, TLD components
+   - Validates URL structure
+   - Detects malformed URLs
+
+2. SSRF PROTECTION (ssrf-protection.ts)
+   - Blocks internal/private network access
+   - Prevents Server-Side Request Forgery attacks
+   - Blocked hosts: localhost, 127.0.0.1, 0.0.0.0, [::1], metadata.google.internal, 169.254.169.254
+
+3. DNS RESOLUTION
+   - Uses Node.js dns.resolve() for A, AAAA, MX, NS records
+   - Detects DOMAIN_NOT_FOUND (critical) when neither A nor AAAA resolves
+   - Logs MX record existence
+
+4. HTTP/HTTPS REACHABILITY
+   - Fetches page via fetch() with real browser User-Agent
+   - Uses AbortSignal timeout for connection limits
+   - Tracks response time
+   - NOTE: HTTPS is NOT treated as a safety signal (most phishing sites use free SSL)
+
+5. TLS CERTIFICATE INSPECTION
+   - Opens raw socket with rejectUnauthorized: false
+   - Extracts SSL certificate issuer
+   - Detects SSL_HOSTNAME_MISMATCH (high) via subjectAltName/wildcard matching
+   - Identifies self-signed and expired certificates
+
+6. REDIRECT FOLLOWING
+   - Follows up to 5 redirect hops
+   - Detects cross-domain redirects
+   - Flags suspicious redirect chains
+
+7. RDAP DOMAIN AGE LOOKUP
+   - Queries RDAP endpoints per TLD (.com, .net, .org, .xyz, .online)
+   - Detects newly registered domains (common in phishing)
+
+8. URL FEATURE EXTRACTION (15+ indicators)
+   - IP_ADDRESS_URL: URL uses IP address instead of domain
+   - UNUSUAL_PORT: Non-standard port detection
+   - URL_SHORTENER: bit.ly, tinyurl, t.co, goo.gl, is.gd, etc.
+   - LOOKALIKE_DOMAIN: Typosquatting against 25+ brands
+   - SUSPICIOUS_TLD: .xyz, .online, .top, .buzz, .tk, .ml, .ga, etc.
+   - SCAM_KEYWORDS: cash, claim, prize, winner, lottery, inheritance, million, etc.
+   - BLOCKED_HOST: Internal/restricted host detection
+   - @ symbol in URL
+   - Port in URL
+
+9. LIVE PAGE CONTENT ANALYSIS (up to ~100KB)
+   - Page title extraction
+   - Meta description analysis
+   - Detected language
+   - Topic category classification
+   - Data collection warnings:
+     * hasLoginForm: Login form detection
+     * hasPasswordFields: Password input fields
+     * hasCreditCardFields: Credit card input fields
+   - Brand detection (detectedBrands, socialMediaBrands)
+   - suspiciousScriptCount: External/suspicious scripts
+   - externalLinkCount: Outbound links
+   - isParkedDomain: Parked/empty domain detection
+   - isEmptyPage: Content-less pages
+   - formActionExternal: Forms submitting to external domains
+   - contentSnippet: First 500 chars of visible text
+
+10. EXTERNAL THREAT INTELLIGENCE (optional, gated by API keys)
+    - Google Safe Browsing API (GOOGLE_SAFE_BROWSING_API_KEY)
+    - PhishTank API (PHISHTANK_API_KEY)
+    - VirusTotal API (VIRUSTOTAL_API_KEY)
+    - Each returns early with no error when key is absent (works fully offline)
+
+LOOKALIKE BRANDS DETECTED (25+):
+─────────────────────────────────
+PayPal, Microsoft, Apple, Google, Amazon, Netflix, WhatsApp, Facebook,
+Instagram, Twitter, LinkedIn, Bank (generic), Government, HBL, UBL,
+JazzCash, EasyPaisa
+
+SCAM KEYWORDS IN URLs:
+──────────────────────
+cash, claim, prize, winner, lottery, inheritance, million, billion,
+free-money, giveaway, urgent, verify-account, secure-account, login-verify,
+update-account, confirm-identity, rs5000, rs10000, independence-day,
+election, bomb, arrest, suspend, expire, bitcoin, crypto
+
+SUSPICIOUS TLDS:
+────────────────
+online, xyz, top, buzz, icu, tk, ml, ga, cf, gq, club, work, click,
+link, download, racing, win, bid, stream, loan, review, accountant,
+science, party, faith
+
+TOTAL INDICATORS: 30+
+
+================================================================================
+2. PHONE NUMBER SCANNING SYSTEM
+================================================================================
+
+Files: 
+  - src/services/fraud/phone-analyzer.ts (851 lines)
+  - src/services/fraud/phone-lookup.ts (1222 lines)
+API Route: /api/fraud/scan/phone
+
+DESCRIPTION:
+The phone scanner integrates multiple caller ID databases for real-time owner
+name lookup, spam score, carrier detection, and verification status. Supports
+mobile, landline, VoIP, and premium rate numbers across 12+ countries.
+
+ANALYSIS PIPELINE:
+──────────────────
+
+1. NUMBER NORMALIZATION
+   - Removes spaces, dashes, parentheses
+   - Converts 00 prefix to + format
+   - Handles local and international formats
+
+2. COUNTRY DETECTION
+   - Auto-detects country from dial code
+   - Supports: Pakistan, India, USA, UK, UAE, Saudi Arabia, China, Turkey,
+     Germany, France, Japan
+   - Falls back to "Unknown" for unrecognized formats
+
+3. NETWORK/CARRIER DETECTION (prefix-based)
+   - Pakistan: Jazz, Warid, Zong, Ufone, Telenor, SCOM, PTCL, Transworld, Nayatel
+   - India: Jio, Airtel, Vi, BSNL
+   - USA: AT&T, Verizon, T-Mobile
+   - UK: EE, Vodafone, O2, Three
+   - And more for each supported country
+   - Returns: name, MCC code, MNC code, type (mobile/landline/voip/premium)
+
+4. REGION/LOCATION DETECTION
+   - Mobile numbers: Nationwide (not geographically bound)
+   - Landline numbers: Geographically mapped to specific cities
+   - Pakistan regions: Karachi, Lahore, Islamabad, Peshawar, Quetta, etc.
+
+5. PREMIUM RATE & SCAM PREFIX DETECTION
+   - Premium rate prefixes: 0900 (Pakistan), 900 (Turkey), etc.
+   - Known scam prefixes: 09001-09005 (Pakistan)
+   - Flags as "danger" type indicators
+
+6. SPAM DATABASE CHECK
+   - Built-in KNOWN_SPAM_REPORTS database
+   - Reports: count, categories (SMS Phishing, Bank Scam, etc.)
+   - Demo numbers for testing included
+
+7. LIVE LOOKUP CASCADE (9 tiers via phone-lookup.ts)
+   
+   TIER 1: Direct Truecaller API (search5-noneu.truecaller.com)
+           - Unlimited, needs installationId
+           - BLOCKED from Pakistan
+   
+   TIER 2: Primary RapidAPI (truecaller-api13, POST v2.php)
+           - TRUECALLER_API_KEY pool
+   
+   TIER 3: Backup RapidAPI (truecaller-data2, GET)
+           - TRUECALLER_BACKUP_API_KEY pool
+   
+   TIER 4: Fallback v15/v46 (truecaller15, truecaller46, GET)
+           - Uses backup + tertiary keys
+   
+   TIER 5: Tertiary RapidAPI (data2/v15/v46)
+           - TRUECALLER_TERTIARY_API_KEY pool
+   
+   TIER 6: Truecaller API3 (truecaller-api3.p.rapidapi.com, POST /v2.php)
+           - ACTIVE
+   
+   TIER 7: Truecaller API4 (truecaller4.p.rapidapi.com, GET /api/v1/getDetails)
+           - ACTIVE; returns name/score/phones/addresses
+           - "PUBLIC" access produces Verified badge
+   
+   TIER 8: Truecaller API11 (truecaller-api11.p.rapidapi.com, POST /v2.php)
+           - ACTIVE
+   
+   TIER 9: Eyecon (2 endpoints)
+           - eyecon.p.rapidapi.com
+           - caller-id-social-search-eyecon.p.rapidapi.com
+
+8. PROVIDER-SCOPED RATE LIMITING
+   - Each API tracks quota independently
+   - Composite keys: tc-primary:key, tc-api3:key, tc-api4:key, tc-api11:key, eyecon:key
+   - Fixes shared-key exhaustion bug
+
+9. KEY MANAGEMENT
+   - Unlimited keys via comma-separated env vars
+   - Numbered env vars (TRUECALLER_KEY_1 to TRUECALLER_KEY_99)
+   - JSON file: config/truecaller-keys.json
+   - 30-minute result cache
+   - Pool cache refreshes every 5 minutes
+
+10. LIVE DATA INTEGRATION
+    - Carrier name (overrides prefix-based detection)
+    - Line type (mobile/landline/voip)
+    - Location (city/region)
+    - isWhatsApp, isVoIP, isRegistered, isRoaming flags
+    - Truecaller name, spam score, type, verified status
+
+RISK SCORING FACTORS:
+─────────────────────
+- Invalid format: +50
+- Unknown network: +10
+- Unknown country: +20
+- Scam pattern match: +30 (danger) or +15 (warning)
+- Spam reports: +2 per report (capped at +40)
+- Truecaller spam score: +0.5 per point (capped at +35)
+- Landline without live verification: +15
+- VoIP detected: Warning indicator
+
+OUTPUT DATA:
+────────────
+- number, normalized format
+- isValid, country, countryCode, countryEmoji
+- network: { name, mcc, mnc, type }
+- region: { province, city, areaCode }
+- riskScore (0-100), riskLevel (safe/low/medium/high/critical)
+- indicators[]: type (info/warning/danger), label, value
+- spamReports: { reported, reportCount, categories }
+- socialPresence: { possible, platforms }
+- recommendation
+- complaintPath: { authority, helpline, website }
+- liveData: { source, lineType, carrier, location, isWhatsApp, isVoIP, ... }
+- analysisConfidence: { level, percentage, factors }
+- detailedAnalysis: { numberValidity, networkReliability, locationInfo, ... }
+
+================================================================================
+3. DOCUMENT SCANNING SYSTEM
+================================================================================
+
+File: src/services/fraud/document-processor.ts (167 lines)
+API Route: /api/fraud/scan/document
+
+DESCRIPTION:
+The document scanner extracts text from uploaded files and analyzes them for
+fraud indicators. Supports PDF, DOCX, TXT, MD, and images (PNG/JPG/WebP).
+
+SUPPORTED FILE TYPES:
+─────────────────────
+1. PDF (application/pdf)
+   - Library: pdf2json (event-based, serverless-compatible)
+   - Extracts text from all pages
+   - Handles large documents
+
+2. DOCX (application/vnd.openxmlformats-officedocument.wordprocessingml.document)
+   - Library: mammoth
+   - Extracts raw text content
+
+3. Plain Text (text/plain, text/markdown, text/x-markdown)
+   - Direct UTF-8 string conversion
+
+4. Images (image/png, image/jpeg, image/gif, image/webp, image/bmp, image/svg+xml)
+   - OCR handled client-side via tesseract.js
+   - Server returns placeholder for client processing
+
+PROCESSING PIPELINE:
+────────────────────
+
+1. FILE VALIDATION (file-validation.ts)
+   - Checks file size limits
+   - Validates MIME type
+   - Prevents malicious file uploads
+
+2. TEXT EXTRACTION
+   - PDF: pdf2json with event-based API (pdfParser_dataReady, pdfParser_dataError)
+   - DOCX: mammoth.extractRawText()
+   - TXT/MD: Buffer.toString('utf-8')
+   - Images: Client-side tesseract.js OCR
+
+3. URL EXTRACTION
+   - Regex: /https?:\/\/[^\s<>"']+/gi
+   - Deduplicates found URLs
+   - Up to 5 URLs analyzed via url-analyzer
+
+4. SUSPICIOUS CONTENT CHECK
+   - Detects embedded scripts: <script>, <iframe>
+   - Detects macro references
+   - Detects code execution: vbscript:, javascript:, <?php, eval(), exec()
+
+5. TEXT ANALYSIS (reuses text-analyzer.ts)
+   - Runs full rule engine analysis
+   - Detects scam patterns, urgency, threats
+   - Identifies brand impersonation
+
+6. URL ANALYSIS (reuses url-analyzer.ts)
+   - Analyzes each extracted URL
+   - Combines indicators with document indicators
+
+7. RISK SCORING
+   - Aggregates text + URL + suspicious content indicators
+   - Calculates final risk score (0-100)
+
+8. AI EXPLANATION
+   - Generates natural language explanation
+   - Provides recommended actions
+
+9. PERSISTENCE
+   - Creates FraudReport record
+   - Creates FraudIndicator records for each finding
+   - Redacts sensitive data before storage
+
+================================================================================
+4. TEXT/SMS/MESSAGE SCANNING SYSTEM
+================================================================================
+
+File: src/services/fraud/text-analyzer.ts (320 lines)
+API Route: /api/fraud/scan (route.ts)
+
+DESCRIPTION:
+The text scanner analyzes SMS messages, text content, and email bodies for
+fraud indicators, scam patterns, brand impersonation, and USSD codes.
+
+ANALYSIS PIPELINE:
+──────────────────
+
+1. RULE ENGINE ANALYSIS (rule-engine.ts)
+   - Runs 27+ fraud detection rules
+   - Each rule has: id, pattern, severity, score, description
+   - Rules categories: keyword, pattern, url, behavioral, domain
+
+2. BRAND IMPERSONATION CHECK
+   - Detects mentions of known brands with urgency language
+   - Brands: PayPal, Microsoft, Apple, Google, Amazon, Netflix, WhatsApp,
+     Facebook, Instagram, Twitter, LinkedIn, HBL, UBL, JazzCash, EasyPaisa,
+     Bank, Government
+   - Urgency words: urgent, immediately, suspended, blocked, verify, confirm
+
+3. SCAM PATTERN DETECTION
+   - FREE_MONEY: "free cash/money/grant/fund/credit"
+   - CASH_PRIZE: "Rs. X free/grant/claim/reward/prize/bonus"
+   - CLAIM_REWARD: "claim/collect/receive your now cash/money/prize"
+   - CLICK_BAIT: "click here/below/on this"
+   - URDU_SCAM_KEYWORDS: Urdu/Roman Urdu scam terms
+   - SCAM_AMOUNT: Round rupee amounts (with legitimate context suppression)
+   - HOLIDAY_LURE: Independence day, holiday references
+   - MASS_TARGET: "Pakistanis", "all citizens"
+   - CASH_GRANT: "نقد گرانٹ" / "cash grant"
+   - FREE_RUPEES: "free rupees/pkr/rs"
+
+4. NETWORK PROMOTIONAL MESSAGE DETECTION
+   - Detects Jazz, Zong, Telenor, Ufone branding
+   - Identifies legitimate promotional patterns
+   - Flags impersonation if combined with suspicious patterns
+
+5. USSD CODE ANALYSIS (ussd-analyzer.ts)
+   - Extracts USSD codes from text
+   - Classifies as safe/dangerous/critical
+   - Provides Urdu translations and recommendations
+
+6. PHONE NUMBER EXTRACTION
+   - Extracts phone numbers: +?\d{10,15}
+   - Adds to patterns list for further analysis
+
+7. URL EXTRACTION & ANALYSIS
+   - Extracts URLs from text
+   - Analyzes up to 5 URLs via url-analyzer
+   - Combines text and URL indicators
+
+LEGITIMATE CONTEXT SUPPRESSION:
+───────────────────────────────
+Prevents false positives on legitimate institutional messages by suppressing
+SCAM_AMOUNT and FAKE_JOB_FEE rules when context contains:
+- admission, university, college, school, fee, registration, scholarship
+- hospital, clinic, doctor, pharmacy, utility, electricity, gas, water
+- nust, fast, uet, board, commission, ministry, government
+
+================================================================================
+5. EMAIL SCANNING SYSTEM
+================================================================================
+
+File: src/services/fraud/text-analyzer.ts (email-specific functions)
+API Route: /api/fraud/scan (inputType: 'email')
+
+DESCRIPTION:
+Email scanning extends the text scanner with email-specific header analysis
+and sender verification checks.
+
+EMAIL-SPECIFIC ANALYSIS:
+────────────────────────
+
+1. EMAIL HEADER DETECTION
+   - REPLY_TO_HEADER: Reply-To header present
+   - FROM_HEADER: From header detected
+   - X_MAILER_HEADER: X-Mailer header (email client identification)
+
+2. REPLY-TO MISMATCH DETECTION
+   - Compares From and Reply-To addresses
+   - Flags REPLY_TO_MISMATCH (high) if different
+   - Common in phishing emails
+
+3. SENDER DOMAIN MISMATCH
+   - Detects personal email domains: gmail.com, yahoo.com, hotmail.com,
+     outlook.com, aol.com
+   - Checks if content claims to be from bank/official entity
+   - Flags SENDER_DOMAIN_MISMATCH (high) if mismatch detected
+
+4. ALL TEXT ANALYSIS APPLIES
+   - Rule engine analysis
+   - Brand impersonation check
+   - Scam pattern detection
+   - USSD code analysis
+   - URL extraction and analysis
+
+================================================================================
+6. SCREENSHOT/IMAGE SCANNING SYSTEM
+================================================================================
+
+File: src/services/fraud/document-processor.ts (processImage method)
+Frontend: Client-side tesseract.js OCR
+API Route: /api/fraud/scan/document (with image MIME type)
+
+DESCRIPTION:
+Image/screenshot scanning uses OCR (Optical Character Recognition) to extract
+text from images, then analyzes the extracted text for fraud indicators.
+
+PROCESSING APPROACH:
+────────────────────
+
+1. CLIENT-SIDE OCR (tesseract.js)
+   - Runs in browser via JavaScript
+   - Supports: PNG, JPEG, GIF, WebP, BMP
+   - No server-side processing required
+   - Trained data files: eng.traineddata, urd.traineddata (English + Urdu)
+
+2. TEXT EXTRACTION
+   - OCR converts image to text
+   - Extracted text sent to server for analysis
+
+3. SERVER-SIDE ANALYSIS
+   - Extracted text processed through text-analyzer
+   - URLs extracted and analyzed
+   - Risk score calculated
+
+4. INDICATORS
+   - All text-based indicators apply
+   - URL indicators if links found in OCR text
+   - Brand impersonation detection
+   - Scam pattern matching
+
+SUPPORTED IMAGE FORMATS:
+────────────────────────
+- image/png
+- image/jpeg
+- image/gif
+- image/webp
+- image/bmp
+- image/svg+xml
+
+================================================================================
+7. USSD CODE SCANNING SYSTEM
+================================================================================
+
+File: src/services/fraud/ussd-analyzer.ts (269 lines)
+Integrated into: text-analyzer.ts
+
+DESCRIPTION:
+USSD (Unstructured Supplementary Service Data) code analyzer detects dangerous
+phone codes that can hijack calls, erase phones, or enable fraud.
+
+DANGEROUS USSD CODES DETECTED:
+──────────────────────────────
+
+CRITICAL RISK:
+- *#21# : Check unconditional call forwarding status
+- *#62# : Check conditional forwarding when phone off
+- **21*<number># : Set unconditional call forwarding (hijack risk)
+- **62*<number># : Set conditional forwarding (hijack risk)
+- *2767*3855# : Samsung factory reset - ALL DATA ERASED
+- *#*#7780#*#* : Android factory reset - data reset
+
+DANGEROUS RISK:
+- *#67# : Check call forwarding when line busy
+- **67*<number># : Set busy call forwarding
+
+CAUTION RISK:
+- *#002# : Cancel ALL call forwarding (actually safe)
+- *#0*# : Samsung hardware test mode
+- *#8*# : Samsung touch screen test
+
+SAFE NETWORK CODES:
+───────────────────
+- *123# : Balance check (varies by network)
+- *111# : Jazz service code
+- *222# : Ufone service code
+- *310# : Zong service code
+- *345# : Telenor service code
+- *100# : Service code
+- *555# : Service code
+
+UNKNOWN CODE HANDLING:
+──────────────────────
+- Complex codes (3+ stars, 2+ hashes): CAUTION - do not dial
+- Standard 3-4 digit codes: SAFE - standard network service
+- Unrecognized codes: CAUTION - verify with operator first
+
+OUTPUT PER CODE:
+────────────────
+- code: The USSD code
+- risk: safe/caution/dangerous/critical
+- category: Call Forwarding, Factory Reset, Network Service, etc.
+- description: English description
+- descriptionUrdu: Urdu translation
+- whatItDoes: Detailed explanation
+- whatItDoesUrdu: Urdu explanation
+- riskLevel: Risk level description
+- recommendation: What to do
+- recommendationUrdu: Urdu recommendation
+
+================================================================================
+8. RISK SCORING ENGINE
+================================================================================
+
+File: src/services/fraud/risk-scorer.ts (54 lines)
+
+DESCRIPTION:
+Aggregates all indicators into a final risk score (0-100) with severity-based
+weighting.
+
+SEVERITY WEIGHTS:
+─────────────────
+- critical: 25 points
+- high: 15 points
+- medium: 8 points
+- low: 3 points
+
+RISK LEVEL MAPPING:
+───────────────────
+- 0: SAFE
+- 1-10: LOW
+- 11-30: MEDIUM
+- 31-60: HIGH
+- 61-100: CRITICAL
+
+SCORE CALCULATION:
+──────────────────
+1. Sum all indicator scores (or severity-based defaults)
+2. Cap at 100 maximum
+3. Map to risk level
+4. Return breakdown by severity category
+
+================================================================================
+9. AI EXPLANATION SYSTEM
+================================================================================
+
+File: src/services/fraud/ai-explainer.ts (192 lines)
+
+DESCRIPTION:
+Generates natural language explanations of scan results with recommended
+actions and real-world context.
+
+EXPLANATION COMPONENTS:
+───────────────────────
+
+1. RISK ASSESSMENT
+   - Critical: "contains X critical red flags"
+   - High: "shows X high-priority warning signs"
+   - Medium: "has X moderate concerns"
+   - Low: "shows minor concerns"
+   - Safe: "No suspicious patterns detected"
+
+2. KEY FINDINGS
+   - Lists top 5 indicators with severity tags
+   - Format: [CRITICAL], [HIGH], [MEDIUM], [LOW]
+
+3. RECOMMENDED ACTIONS (based on risk level)
+   - High risk (>60): Do NOT click links, do NOT share info, verify sender
+   - Medium risk (>30): Verify sender, don't share sensitive info
+   - Low risk (>0): Exercise normal caution
+   - Safe: No immediate action required
+
+4. USSD CODE RECOMMENDATIONS
+   - Specific actions for dangerous USSD codes found
+   - Cancel forwarding instructions
+
+5. REAL-WORLD CONTEXT
+   - Links indicators to known scam trends
+   - Provides statistics from scam knowledge base
+
+6. COMPLAINT PATH
+   - Country-specific reporting authorities
+   - Helpline numbers and websites
+
+================================================================================
+10. COMPLAINT PATHS & REPORTING
+================================================================================
+
+File: src/services/fraud/complaint-paths.ts (647 lines)
+
+DESCRIPTION:
+Provides country-specific complaint procedures and authority contacts for
+reporting fraud and cybercrime.
+
+SUPPORTED COUNTRIES (13+):
+──────────────────────────
+
+PAKISTAN:
+- NCCIA Cybercrime Wing (Helpline 1991)
+- State Bank of Pakistan - Sunwai Portal (0800-222-78)
+- SECP (+92-51-111-111-472)
+- PTA (0800-55055)
+- FIA Cyber Crime Wing
+- Police Emergency (15)
+
+INDIA:
+- National Cyber Crime Reporting Portal (1930)
+- CERT-In
+
+UNITED STATES:
+- FTC (1-877-382-4357)
+- IC3 (FBI)
+- CISA
+
+UNITED KINGDOM:
+- Action Fraud (0300 123 2040)
+- NCSC
+
+CANADA:
+- Canadian Anti-Fraud Centre
+
+AUSTRALIA:
+- ACSC
+- Scamwatch (ACCC)
+
+GERMANY:
+- BSI
+- BKA
+
+FRANCE:
+- PHAROS Platform
+- Cybermalveillance.gouv.fr
+
+JAPAN:
+- National Police Agency (#9110)
+- JPCERT/CC
+
+CHINA:
+- Ministry of Public Security (110)
+- 12321 Internet Reporting Center
+
+BRAZIL:
+- Policia Federal
+- CERT.br
+
+NIGERIA:
+- Nigeria Police Force
+- EFCC
+
+SOUTH AFRICA:
+- SAPS Cybercrime Unit
+
+UAE:
+- Dubai Police (901)
+- Abu Dhabi Police (999)
+
+SAUDI ARABIA:
+- SAFCSP (999)
+
+TURKEY:
+- BTK
+
+INDONESIA:
+- BSSN
+
+MEXICO:
+- Guardia Nacional (088)
+- CERT-MX
+
+RUSSIA:
+- MVD Cybercrime Unit (102)
+
+COMPLAINT PATH COMPONENTS:
+──────────────────────────
+- scamType: Category of scam
+- scamTypeUrdu: Urdu translation
+- immediateActions: Steps to take immediately
+- complaintContacts: Authority contact details
+- requiredDocuments: Documents needed for complaint
+- onlineComplaintUrl: Web portal URL
+- timeframe: Reporting deadline
+- additionalTips: Extra guidance
+
+================================================================================
+11. SCAM KNOWLEDGE BASE
+================================================================================
+
+File: src/services/fraud/scam-knowledge-base.ts (366 lines)
+
+DESCRIPTION:
+Contains known scam trends, statistics, and prevention tips categorized by
+scam type.
+
+SCAM TRENDS TRACKED:
+────────────────────
+
+1. INVESTMENT & TRADING SCAM (Critical)
+   - Fake platforms promising guaranteed returns
+   - 2024: 12,450 reports | 2025: 15,200 reports (rising)
+   - Indicators: INVESTMENT_SCAM, URGENCY, TIME_PRESSURE, PROMISE_MILLIONS
+
+2. FAKE JOB / EARNING SCAM (High)
+   - Data entry tasks requiring upfront payment
+   - 2024: 8,900 reports | 2025: 11,300 reports (rising)
+   - Indicators: JOB_SCAM, FAKE_JOB_FEE, MANDATE_FEE, URGENCY
+
+3. BANK / WALLET PHISHING (Critical)
+   - Fake messages impersonating banks
+   - 2024: 18,700 reports | 2025: 21,400 reports (rising)
+   - Indicators: OTP_REQUEST, PASSWORD_REQUEST, PIN_REQUEST, ACCOUNT_SUSPENSION
+
+4. PRIZE / LOTTERY / GIVEAWAY SCAM (High)
+   - Messages claiming you won a prize
+   - 2024: 9,800 reports | 2025: 7,600 reports (declining)
+   - Indicators: PRIZE_SCAM, FAKE_REWARD, CLICK_BAIT, TIME_PRESSURE
+
+5. ROMANCE / FRIENDSHIP SCAM (High)
+   - Fake profiles building emotional connection
+   - 2024: 6,200 reports | 2025: 7,100 reports (rising)
+   - Indicators: URGENCY, THREAT, PAYMENT_REQUEST, TIME_PRESSURE
+
+6. CRYPTOCURRENCY / WALLET SCAM (Critical)
+   - Fake exchanges, pump-and-dump schemes
+   - 2024: 7,800 reports | 2025: 10,500 reports (rising)
+   - Indicators: CRYPTO_PRESSURE, INVESTMENT_SCAM, CREDENTIAL_HARVEST
+
+7. ONLINE GAMBLING / BETTING SCAM (Critical)
+   - Fake casinos, initial small wins then large losses
+   - 2024: 5,400 reports | 2025: 8,900 reports (rising)
+   - Indicators: GAMBLING_SCAM, FAKE_REWARD, PROMISE_MILLIONS, FREE_MONEY
+
+8. SMS / TEXT MESSAGE SCAM (High)
+   - Unsolicited SMS with malicious links
+   - 2024: 15,600 reports | 2025: 14,200 reports (stable)
+   - Indicators: URL_SHORTENER, SUSPICIOUS_TLD, SCAM_KEYWORD
+
+9. FAKE LOAN / CREDIT SCAM (High)
+   - Instant loans requiring upfront fees
+   - 2024: 6,700 reports | 2025: 5,800 reports (stable)
+   - Indicators: FAKE_JOB_FEE, MANDATE_FEE, URGENCY, TIME_PRESSURE
+
+10. SOCIAL MEDIA IMPERSONATION SCAM (Medium)
+    - Fake profiles, fake giveaways
+    - 2024: 8,200 reports | 2025: 9,400 reports (rising)
+    - Indicators: IMPERSONATION, LOOKALIKE, SENDER_MISMATCH
+
+STATISTICS:
+───────────
+Pakistan 2024: 184,000 reports, PKR 12.5 Billion losses
+Pakistan 2025: 210,000 reports, PKR 15.8 Billion losses (Jan-Jun)
+Global 2024: 2,600,000 reports, USD 12.5 Billion losses
+Global 2025: 1,450,000 reports, USD 8.2 Billion losses (Jan-Jun)
+
+PREVENTION TIPS BY CATEGORY:
+────────────────────────────
+- Financial: Verify with SECP/SEC, no guaranteed returns
+- Credential Theft: Banks never ask for PIN/OTP via SMS
+- Scam: Can't win lottery you didn't enter
+- Gambling: Online gambling illegal in Pakistan
+
+================================================================================
+12. RULE ENGINE - COMPLETE RULE LIST
+================================================================================
+
+File: src/services/fraud/rule-engine.ts (396 lines)
+
+27 FRAUD DETECTION RULES:
+─────────────────────────
+
+CREDENTIAL THEFT:
+1. OTP_REQUEST (Critical, 30pts): OTP/verification code requests
+2. PASSWORD_REQUEST (Critical, 25pts): Password sharing requests
+3. PIN_REQUEST (Critical, 25pts): PIN sharing requests
+4. CVV_REQUEST (Critical, 25pts): CVV/card detail requests
+5. CREDENTIAL_HARVEST (Medium, 12pts): Account verification attempts
+
+SOCIAL ENGINEERING:
+6. URGENCY (High, 15pts): Urgency and pressure tactics
+7. THREAT (High, 20pts): Threatening language
+8. ACCOUNT_SUSPENSION (High, 22pts): Account blocking threats
+9. TIME_PRESSURE (Medium, 12pts): Time-limited offers
+
+SCAM PATTERNS:
+10. PRIZE_SCAM (High, 20pts): Prize/lottery wins
+11. FAKE_REFUND (Medium, 15pts): Fake refund claims
+12. INVESTMENT_SCAM (High, 20pts): Guaranteed returns
+13. JOB_SCAM (Medium, 15pts): Fake job offers
+14. SCHOLARSHIP_SCAM (High, 18pts): Guaranteed admissions
+15. GAMBLING_SCAM (Critical, 28pts): Online gambling/betting
+16. FAKE_REWARD (High, 20pts): Fake giveaways
+17. PROMISE_MILLIONS (High, 18pts): Large sum promises
+18. FAKE_JOB_FEE (High, 18pts): Registration/training fees
+19. MANDATE_FEE (High, 16pts): Processing/activation fees
+
+IMPERSONATION:
+20. IMPERSONATION (High, 18pts): Bank impersonation
+21. LOOKALIKE (High, 18pts): Typosquatting domains
+22. SENDER_MISMATCH (High, 15pts): Email sender mismatch
+
+FINANCIAL:
+23. PAYMENT_REQUEST (High, 20pts): Money transfer requests
+24. CRYPTO_PRESSURE (Medium, 10pts): Cryptocurrency tactics
+25. ACCOUNT_THEFT (Medium, 10pts): Unauthorized transaction claims
+
+URL/DOMAIN:
+26. URL_SHORTENER (Medium, 10pts): URL shortening services
+27. SUSPICIOUS_TLD (Medium, 8pts): Suspicious top-level domains
+
+MALWARE:
+28. ATTACHMENT_WARNING (Medium, 8pts): Suspicious attachment references
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================
+
+Generated: 2026-09-06
+Project: EduGuard AI - FraudGuard
+Production: https://eduguard-ai-steel.vercel.app
+Source: src/services/fraud/

@@ -19,12 +19,27 @@ interface ScanResult {
   complaintPath?: {
     scamType: string;
     scamTypeUrdu: string;
+    scamTypeRomanUrdu?: string;
     immediateActions: string[];
-    complaintContacts: { name: string; phone: string; website: string; address?: string; hours?: string }[];
+    immediateActionsUrdu?: string[];
+    immediateActionsRomanUrdu?: string[];
+    complaintContacts: { name: string; nameUrdu?: string; nameRomanUrdu?: string; phone: string; website: string; address?: string; addressUrdu?: string; addressRomanUrdu?: string; hours?: string; hoursUrdu?: string; hoursRomanUrdu?: string }[];
     requiredDocuments: string[];
+    requiredDocumentsUrdu?: string[];
+    requiredDocumentsRomanUrdu?: string[];
     onlineComplaintUrl: string;
     timeframe: string;
+    timeframeUrdu?: string;
+    timeframeRomanUrdu?: string;
     additionalTips: string[];
+    additionalTipsUrdu?: string[];
+    additionalTipsRomanUrdu?: string[];
+    evidenceChecklist?: string[];
+    evidenceChecklistUrdu?: string[];
+    evidenceChecklistRomanUrdu?: string[];
+    stepByStepGuide?: string[];
+    stepByStepGuideUrdu?: string[];
+    stepByStepGuideRomanUrdu?: string[];
   };
   ussdAnalysis?: {
     code: string;
@@ -268,48 +283,107 @@ function CheckTextContent() {
             {result.complaintPath && result.riskScore > 30 && (
               <div className="mt-4 space-y-4">
                 <div className="bg-amber-500/15 border border-amber-500/30 rounded-lg p-4">
-                  <h3 className="text-sm font-semibold text-amber-300 mb-2">
-                    Complaint Path: {result.complaintPath.scamType}
+                  <h3 className="text-sm font-semibold text-amber-300 mb-1">
+                    📋 Complaint Guide: {result.complaintPath.scamType}
                   </h3>
-                  <p className="text-xs text-amber-400/70 mb-3">{result.complaintPath.scamTypeUrdu}</p>
+                  <p className="text-xs text-amber-300 mb-1">اردو: {result.complaintPath.scamTypeUrdu}</p>
+                  {result.complaintPath.scamTypeRomanUrdu && (
+                    <p className="text-xs text-amber-300/80 mb-3 italic">Roman Urdu: {result.complaintPath.scamTypeRomanUrdu}</p>
+                  )}
+
+                  {/* Step-by-Step Guide */}
+                  {result.complaintPath.stepByStepGuide && result.complaintPath.stepByStepGuide.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="text-xs font-semibold text-green-300 mb-2">📝 Step-by-Step Complaint Guide:</h4>
+                      <ol className="list-decimal list-inside space-y-1">
+                        {result.complaintPath.stepByStepGuide.map((step, i) => (
+                          <li key={i} className="text-xs text-gray-300">{step}</li>
+                        ))}
+                      </ol>
+                      {result.complaintPath.stepByStepGuideRomanUrdu && result.complaintPath.stepByStepGuideRomanUrdu.length > 0 && (
+                        <div className="mt-2 bg-green-500/5 border border-green-500/20 rounded-lg p-2">
+                          <p className="text-xs font-semibold text-green-300 mb-1">Roman Urdu:</p>
+                          <ol className="list-decimal list-inside space-y-0.5">
+                            {result.complaintPath.stepByStepGuideRomanUrdu.map((step, i) => (
+                              <li key={i} className="text-xs text-gray-200">{step}</li>
+                            ))}
+                          </ol>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div className="mb-3">
-                    <h4 className="text-xs font-semibold text-amber-300 mb-1">Immediate Actions:</h4>
+                    <h4 className="text-xs font-semibold text-amber-300 mb-1">⚡ Immediate Actions:</h4>
                     <ol className="list-decimal list-inside space-y-1">
                       {result.complaintPath.immediateActions.map((action, i) => (
                         <li key={i} className="text-xs text-gray-300">{action}</li>
                       ))}
                     </ol>
+                    {result.complaintPath.immediateActionsRomanUrdu && result.complaintPath.immediateActionsRomanUrdu.length > 0 && (
+                      <div className="mt-2 bg-amber-500/5 border border-amber-500/10 rounded-lg p-2">
+                        <p className="text-xs font-semibold text-amber-300 mb-1">Roman Urdu:</p>
+                        <ol className="list-decimal list-inside space-y-0.5">
+                          {result.complaintPath.immediateActionsRomanUrdu.map((action, i) => (
+                            <li key={i} className="text-xs text-gray-200">{action}</li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mb-3">
-                    <h4 className="text-xs font-semibold text-amber-300 mb-1">Where to Complain:</h4>
+                    <h4 className="text-xs font-semibold text-amber-300 mb-1">🏛️ Where to Complain / شکایت کہاں کریں:</h4>
                     <div className="space-y-2">
                       {result.complaintPath.complaintContacts.map((contact, i) => (
                         <div key={i} className="bg-white/5 rounded-lg p-3 border border-amber-500/20">
                           <p className="text-xs font-semibold text-gray-100">{contact.name}</p>
+                          {contact.nameUrdu && <p className="text-xs text-gray-300" dir="rtl">{contact.nameUrdu}</p>}
                           <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
-                            <p className="text-xs text-gray-400">Phone: <span className="text-white font-medium">{contact.phone}</span></p>
-                            {contact.website && (
-                              <a
-                                href={contact.website}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-blue-400 hover:text-blue-300 hover:underline"
-                              >
-                                {contact.website.replace('https://', '').replace(/\/$/, '')} ↗
+                            <p className="text-xs text-gray-400">📞 <span className="text-white font-medium">{contact.phone}</span></p>
+                            {contact.website && contact.website.startsWith('http') ? (
+                              <a href={contact.website} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300 hover:underline">
+                                🌐 {contact.website.replace('https://', '').replace(/\/$/, '')} ↗
                               </a>
-                            )}
+                            ) : contact.website ? (
+                              <span className="text-xs text-gray-400">🌐 {contact.website}</span>
+                            ) : null}
                           </div>
-                          {contact.address && <p className="text-xs text-gray-500 mt-1">{contact.address}</p>}
+                          {contact.address && <p className="text-xs text-gray-500 mt-1">📍 {contact.address}</p>}
                           {contact.hours && <p className="text-xs text-gray-500 mt-0.5">⏰ {contact.hours}</p>}
                         </div>
                       ))}
                     </div>
                   </div>
 
+                  {/* Evidence Checklist */}
+                  {result.complaintPath.evidenceChecklist && result.complaintPath.evidenceChecklist.length > 0 && (
+                    <div className="mb-3">
+                      <h4 className="text-xs font-semibold text-cyan-300 mb-2">🔐 Evidence Checklist / ثبوت کی فہرست:</h4>
+                      <ul className="space-y-1">
+                        {result.complaintPath.evidenceChecklist.map((item, i) => (
+                          <li key={i} className="text-xs text-gray-300 flex items-start gap-1">
+                            <span className="mt-0.5 text-cyan-400">☐</span> {item}
+                          </li>
+                        ))}
+                      </ul>
+                      {result.complaintPath.evidenceChecklistRomanUrdu && result.complaintPath.evidenceChecklistRomanUrdu.length > 0 && (
+                        <div className="mt-2 bg-cyan-500/5 border border-cyan-500/10 rounded-lg p-2">
+                          <p className="text-xs font-semibold text-cyan-300 mb-1">Roman Urdu:</p>
+                          <ul className="space-y-0.5">
+                            {result.complaintPath.evidenceChecklistRomanUrdu.map((item, i) => (
+                              <li key={i} className="text-xs text-gray-200 flex items-start gap-1">
+                                <span className="mt-0.5 text-cyan-300">☐</span> {item}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="mb-3">
-                    <h4 className="text-xs font-semibold text-amber-300 mb-1">Required Documents:</h4>
+                    <h4 className="text-xs font-semibold text-amber-300 mb-1">📄 Required Documents / ضروری دستاویزات:</h4>
                     <ul className="space-y-1">
                       {result.complaintPath.requiredDocuments.map((doc, i) => (
                         <li key={i} className="text-xs text-gray-300 flex items-start gap-1">
@@ -321,10 +395,13 @@ function CheckTextContent() {
 
                   <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2 mb-3">
                     <p className="text-xs font-semibold text-amber-300">⏱ Timeframe: {result.complaintPath.timeframe}</p>
+                    {result.complaintPath.timeframeRomanUrdu && (
+                      <p className="text-xs text-amber-300/80 mt-1 italic">Roman Urdu: {result.complaintPath.timeframeRomanUrdu}</p>
+                    )}
                   </div>
 
                   <div className="mb-3">
-                    <h4 className="text-xs font-semibold text-amber-300 mb-1">Tips:</h4>
+                    <h4 className="text-xs font-semibold text-amber-300 mb-1">💡 Tips:</h4>
                     <ul className="space-y-1">
                       {result.complaintPath.additionalTips.map((tip, i) => (
                         <li key={i} className="text-xs text-gray-300 flex items-start gap-1">
@@ -332,15 +409,27 @@ function CheckTextContent() {
                         </li>
                       ))}
                     </ul>
+                    {result.complaintPath.additionalTipsRomanUrdu && result.complaintPath.additionalTipsRomanUrdu.length > 0 && (
+                      <div className="mt-2 bg-amber-500/5 border border-amber-500/10 rounded-lg p-2">
+                        <p className="text-xs font-semibold text-amber-300 mb-1">Roman Urdu:</p>
+                        <ul className="space-y-0.5">
+                          {result.complaintPath.additionalTipsRomanUrdu.map((tip, i) => (
+                            <li key={i} className="text-xs text-gray-200 flex items-start gap-1">
+                              <span className="text-green-300 mt-0.5">✓</span> {tip}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
 
                   <a
                     href={result.complaintPath.onlineComplaintUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-block w-full text-center bg-amber-500 text-black text-xs font-semibold py-2 px-4 rounded-lg hover:bg-amber-400 transition-colors"
+                    className="inline-block w-full text-center bg-amber-500 text-black text-xs font-semibold py-2.5 px-4 rounded-lg hover:bg-amber-400 transition-colors"
                   >
-                    File Complaint Online →
+                    File Complaint Online / آن لائن شکایت درج کریں →
                   </a>
                 </div>
               </div>
