@@ -62,9 +62,14 @@ export default function BudgetPage() {
   const [setupIncome, setSetupIncome] = useState('');
   const [setupCurrency, setSetupCurrency] = useState('PKR');
   const [setupGoal, setSetupGoal] = useState('');
+  const [setupType, setSetupType] = useState('professional');
+  const [setupCity, setSetupCity] = useState('');
+  const [setupFamilySize, setSetupFamilySize] = useState('1');
+  const [setupRent, setSetupRent] = useState('');
   const [budgetPlan, setBudgetPlan] = useState<BudgetPlan | null>(null);
   const [isApplying, setIsApplying] = useState(false);
   const [applyResult, setApplyResult] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const retryFetch = useCallback(async (attempts = 3, delay = 1500) => {
     for (let i = 0; i < attempts; i++) {
@@ -289,6 +294,10 @@ export default function BudgetPage() {
           monthlyIncome: parseFloat(setupIncome),
           currency: setupCurrency,
           savingsGoal: setupGoal ? parseFloat(setupGoal) : undefined,
+          profileType: setupType,
+          city: setupCity || undefined,
+          familySize: parseInt(setupFamilySize) || 1,
+          monthlyRent: setupRent ? parseFloat(setupRent) : undefined,
         }),
       });
       if (res.ok) {
@@ -299,6 +308,71 @@ export default function BudgetPage() {
       }
     } catch {
       setError('Failed to create budget profile');
+    }
+  };
+
+  const handleGenerateSmartBudget = async () => {
+    setIsGenerating(true);
+    try {
+      const token = localStorage.getItem('accessToken');
+      const income = budgetProfile?.monthlyIncome || 0;
+      const currency = budgetProfile?.currency || 'PKR';
+      const typeLabels: Record<string, string> = { student: 'Student', professional: 'Working Professional', family: 'Family', freelancer: 'Freelancer' };
+      const profileType = (budgetProfile as any)?.profileType || 'professional';
+      const city = (budgetProfile as any)?.city || '';
+      const familySize = (budgetProfile as any)?.familySize || 1;
+      const rent = (budgetProfile as any)?.monthlyRent || 0;
+
+      let message = `Mera budget bana do. Meri details:\n`;
+      message += `- Monthly Income: ${income} ${currency}\n`;
+      message += `- Type: ${typeLabels[profileType] || profileType}\n`;
+      if (city) message += `- City: ${city}\n`;
+      message += `- Family Size: ${familySize}\n`;
+      if (rent > 0) message += `- Monthly Rent: ${rent} ${currency}\n`;
+      if (budgetProfile?.savingsGoal) message += `- Savings Goal: ${budgetProfile.savingsGoal} ${currency}/month\n`;
+
+      // Build messages array for department chat
+      const response = await fetch('/api/chat/department', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          department: 'budget',
+          messages: [{ role: 'user', content: message }],
+        }),
+      });
+
+      if (!response.ok) throw new Error('AI request failed');
+
+      // Read the streaming response
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No response body');
+      const decoder = new TextDecoder();
+      let fullContent = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const text = decoder.decode(value);
+        const lines = text.split('\n').filter(l => l.startsWith('data: '));
+        for (const line of lines) {
+          try {
+            const event = JSON.parse(line.slice(6));
+            if (event.type === 'chunk' && event.content) fullContent += event.content;
+          } catch { /* skip */ }
+        }
+      }
+
+      // Parse budget_plan from AI response
+      const match = fullContent.match(/```budget_plan\s*\n([\s\S]*?)```/);
+      if (match) {
+        const plan = JSON.parse(match[1].trim()) as BudgetPlan;
+        if (plan.allocations && plan.allocations.length > 0) {
+          setBudgetPlan(plan);
+        }
+      }
+    } catch (err) {
+      console.error('Smart budget generation failed:', err);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -341,9 +415,11 @@ export default function BudgetPage() {
         <div className="bg-gradient-to-br from-white/[0.04] to-white/[0.02] rounded-2xl shadow-xl p-8 animate-fade-in border border-emerald-500/20">
           <div className="text-center mb-6">
             <div className="text-4xl mb-2">⚙️</div>
-            <h2 className="text-xl font-bold bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">Quick Setup - Just 3 Steps!</h2>
-            <p className="text-cyan-400 text-sm mt-1">Fill in your details below to start tracking</p>
+            <h2 className="text-xl font-bold bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">Setup Your Smart Budget</h2>
+            <p className="text-cyan-400 text-sm mt-1">Fill in your details — AI will create a personalized budget for you</p>
           </div>
+
+          {/* Row 1: Income, Currency, Savings Goal */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
             <div>
               <label className="flex items-center gap-2 text-sm font-semibold text-emerald-400 mb-2">
@@ -383,10 +459,63 @@ export default function BudgetPage() {
               <p className="text-xs text-gray-500 mt-1">Monthly savings target</p>
             </div>
           </div>
+
+          {/* Row 2: Profile Type, City, Family Size */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-4">
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-cyan-400 mb-2">
+                <span>👤</span> I am a...
+              </label>
+              <select value={setupType} onChange={e => setSetupType(e.target.value)}
+                className="w-full rounded-xl px-4 py-3 text-base text-gray-200 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all"
+                style={{ background: 'rgba(11, 17, 32, 0.8)', border: '2px solid rgba(148, 163, 184, 0.15)' }}>
+                <option value="student">🎓 Student</option>
+                <option value="professional">💼 Working Professional</option>
+                <option value="family">👨‍👩‍👧‍👦 Family</option>
+                <option value="freelancer">💻 Freelancer</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">Helps AI customize your budget</p>
+            </div>
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-cyan-400 mb-2">
+                <span>🏙️</span> City <span className="text-xs text-gray-500">(Optional)</span>
+              </label>
+              <input type="text" value={setupCity} onChange={e => setSetupCity(e.target.value)}
+                className="w-full rounded-xl px-4 py-3 text-base text-gray-200 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all"
+                style={{ background: 'rgba(11, 17, 32, 0.8)', border: '1.5px solid rgba(148, 163, 184, 0.15)' }}
+                placeholder="e.g. Lahore, Karachi" />
+              <p className="text-xs text-gray-500 mt-1">For cost-of-living adjustments</p>
+            </div>
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-cyan-400 mb-2">
+                <span>👥</span> Family Size
+              </label>
+              <input type="number" value={setupFamilySize} onChange={e => setSetupFamilySize(e.target.value)}
+                className="w-full rounded-xl px-4 py-3 text-base text-gray-200 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all"
+                style={{ background: 'rgba(11, 17, 32, 0.8)', border: '1.5px solid rgba(148, 163, 184, 0.15)' }}
+                placeholder="1" min="1" max="20" />
+              <p className="text-xs text-gray-500 mt-1">Including yourself</p>
+            </div>
+          </div>
+
+          {/* Row 3: Monthly Rent */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-4">
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-cyan-400 mb-2">
+                <span>🏠</span> Monthly Rent <span className="text-xs text-gray-500">(Optional)</span>
+              </label>
+              <input type="number" value={setupRent} onChange={e => setSetupRent(e.target.value)}
+                className="w-full rounded-xl px-4 py-3 text-base text-gray-200 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all"
+                style={{ background: 'rgba(11, 17, 32, 0.8)', border: '1.5px solid rgba(148, 163, 184, 0.15)' }}
+                placeholder="e.g. 15000" />
+              <p className="text-xs text-gray-500 mt-1">If you pay rent monthly</p>
+            </div>
+          </div>
+
           <div className="flex gap-3 mt-6">
             <button onClick={handleSetupBudget}
               className="flex-1 px-6 py-3 rounded-xl font-semibold text-base bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600 transition-all shadow-lg hover:shadow-emerald-500/50 transform hover:scale-105">
-              ✅ Save & Start Tracking
+              ✅ Save & Generate Smart Budget
             </button>
             <button onClick={() => setShowSetup(false)}
               className="px-6 py-3 rounded-xl font-semibold text-base bg-white/5 text-gray-300 hover:bg-white/10 transition-all">
@@ -404,6 +533,37 @@ export default function BudgetPage() {
           <button onClick={() => setShowSetup(true)}
             className="px-8 py-3 rounded-xl font-semibold text-base bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600 transition-all shadow-lg hover:shadow-emerald-500/50 transform hover:scale-105">
             🚀 Get Started - It&apos;s Free!
+          </button>
+        </div>
+      )}
+
+      {/* AI Smart Budget Generator - shows when profile exists but no plan generated yet */}
+      {budgetProfile && !budgetPlan && !showChat && (
+        <div className="bg-gradient-to-br from-purple-500/[0.06] to-pink-500/[0.04] rounded-2xl shadow-xl border border-purple-500/25 p-6 animate-fade-in">
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-3xl">🤖</span>
+            <div>
+              <h3 className="text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">AI Smart Budget Generator</h3>
+              <p className="text-xs text-gray-400">Based on your profile, AI will create a personalized budget plan</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 mb-4">
+            <span className="px-3 py-1 rounded-full text-xs bg-white/[0.06] text-gray-300 border border-white/10">💵 Income: {budgetProfile.currency} {Number(budgetProfile.monthlyIncome).toLocaleString()}</span>
+            {(budgetProfile as any)?.profileType && <span className="px-3 py-1 rounded-full text-xs bg-white/[0.06] text-gray-300 border border-white/10">👤 {(budgetProfile as any).profileType}</span>}
+            {(budgetProfile as any)?.city && <span className="px-3 py-1 rounded-full text-xs bg-white/[0.06] text-gray-300 border border-white/10">🏙️ {(budgetProfile as any).city}</span>}
+            {(budgetProfile as any)?.familySize && <span className="px-3 py-1 rounded-full text-xs bg-white/[0.06] text-gray-300 border border-white/10">👥 Family: {(budgetProfile as any).familySize}</span>}
+            {(budgetProfile as any)?.monthlyRent && <span className="px-3 py-1 rounded-full text-xs bg-white/[0.06] text-gray-300 border border-white/10">🏠 Rent: {budgetProfile.currency} {Number((budgetProfile as any).monthlyRent).toLocaleString()}</span>}
+          </div>
+          <button
+            onClick={handleGenerateSmartBudget}
+            disabled={isGenerating}
+            className={`w-full sm:w-auto px-8 py-3 rounded-xl font-semibold text-base transition-all shadow-lg transform hover:scale-105 ${
+              isGenerating
+                ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 hover:shadow-purple-500/50'
+            }`}
+          >
+            {isGenerating ? '⏳ AI is generating your budget...' : '✨ Generate Smart Budget Plan'}
           </button>
         </div>
       )}

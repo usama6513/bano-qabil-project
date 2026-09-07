@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     if ('error' in auth) return auth.error;
 
     const body = await request.json();
-    const { monthlyIncome, currency, savingsGoal } = body;
+    const { monthlyIncome, currency, savingsGoal, profileType, city, familySize, monthlyRent } = body;
 
     if (!monthlyIncome || !currency) {
       return errorResponse('monthlyIncome and currency are required', 'VALIDATION_ERROR', 400);
@@ -36,6 +36,10 @@ export async function POST(request: NextRequest) {
       monthlyIncome,
       currency,
       savingsGoal,
+      profileType,
+      city,
+      familySize,
+      monthlyRent,
     });
 
     return successResponse(profile, 201);

@@ -551,6 +551,10 @@ model BudgetProfile {
   monthlyIncome Decimal? @map("monthly_income")
   currency    String   @default("USD")
   savingsGoal Decimal? @map("savings_goal")
+  profileType String?  @map("profile_type") // student, professional, family, freelancer
+  city        String?
+  familySize  Int?     @map("family_size")
+  monthlyRent Decimal? @map("monthly_rent")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

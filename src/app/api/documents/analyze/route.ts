@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { requireAuth } from '@/lib/auth-middleware';
 import { successResponse, errorResponse } from '@/lib/utils';
 import { documentIntelligenceService } from '@/services/document-intelligence/document-intelligence.service';
+import PdfParser from 'pdf2json';
 
 // Extend timeout for document analysis
 export const maxDuration = 30;
@@ -15,18 +16,17 @@ async function extractTextFromFile(file: File): Promise<string> {
 
   if (ext === 'pdf') {
     const buffer = Buffer.from(await file.arrayBuffer());
-    const textChunks: string[] = [];
-    const str = buffer.toString('latin1');
-    const matches = str.match(/BT[\s\S]*?ET/g);
-    if (matches) {
-      for (const m of matches) {
-        const texts = m.match(/\(([^)]+)\)/g);
-        if (texts) {
-          textChunks.push(...texts.map(t => t.slice(1, -1)));
-        }
-      }
-    }
-    return textChunks.join(' ') || '[PDF content — could not extract text. Please paste the text manually.]';
+    return new Promise<string>((resolve) => {
+      const pdfParser = new (PdfParser as any)(null, process);
+      pdfParser.on('pdfParser_dataError', () => {
+        resolve('[PDF content — could not extract text. Please paste the text manually.]');
+      });
+      pdfParser.on('pdfParser_dataReady', () => {
+        const text = (pdfParser as any).getRawTextContent();
+        resolve(text || '[PDF content — could not extract text. Please paste the text manually.]');
+      });
+      pdfParser.parseBuffer(buffer);
+    });
   }
 
   if (ext === 'docx') {

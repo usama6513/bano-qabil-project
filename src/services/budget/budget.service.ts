@@ -18,19 +18,27 @@ export class BudgetService {
     return profile as unknown as BudgetProfile | null;
   }
 
-  async createBudgetProfile(userId: string, data: { monthlyIncome: number; currency: string; savingsGoal?: number }): Promise<BudgetProfile> {
+  async createBudgetProfile(userId: string, data: { monthlyIncome: number; currency: string; savingsGoal?: number; profileType?: string; city?: string; familySize?: number; monthlyRent?: number }): Promise<BudgetProfile> {
     const profile = await prisma.budgetProfile.upsert({
       where: { userId },
       update: {
         monthlyIncome: data.monthlyIncome,
         currency: data.currency,
         savingsGoal: data.savingsGoal,
+        ...(data.profileType !== undefined && { profileType: data.profileType }),
+        ...(data.city !== undefined && { city: data.city }),
+        ...(data.familySize !== undefined && { familySize: data.familySize }),
+        ...(data.monthlyRent !== undefined && { monthlyRent: data.monthlyRent }),
       },
       create: {
         userId,
         monthlyIncome: data.monthlyIncome,
         currency: data.currency,
         savingsGoal: data.savingsGoal,
+        profileType: data.profileType,
+        city: data.city,
+        familySize: data.familySize,
+        monthlyRent: data.monthlyRent,
       },
     });
     return profile as unknown as BudgetProfile;

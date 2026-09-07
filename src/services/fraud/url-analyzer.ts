@@ -52,6 +52,35 @@ const BLOCKED_HOSTNAMES = [
   '169.254.169.254',
 ];
 
+// Well-known domains that are always safe — skip full analysis, return score=0 instantly.
+// This avoids false positives from minor indicators (redirects, SSL checks, etc.) on trusted sites.
+const TRUSTED_DOMAINS = [
+  // Search engines
+  'google.com', 'google.co.uk', 'google.com.pk', 'bing.com', 'duckduckgo.com', 'yahoo.com',
+  // Developer platforms
+  'github.com', 'gitlab.com', 'bitbucket.org', 'stackoverflow.com', 'stackexchange.com',
+  'developer.mozilla.org', 'npmjs.com', 'pypi.org', 'docker.com',
+  // Professional / social
+  'linkedin.com', 'twitter.com', 'x.com', 'facebook.com', 'instagram.com', 'reddit.com',
+  // Tech giants
+  'apple.com', 'microsoft.com', 'amazon.com', 'amazon.co.uk', 'netflix.com', 'youtube.com',
+  'wikipedia.org', 'wordpress.com', 'medium.com',
+  // Pakistan-specific trusted domains
+  'paklawsite.com', 'pakistanlawsite.com',
+  'nust.edu.pk', 'lums.edu.pk', 'uet.edu.pk', 'pu.edu.pk', 'iub.edu.pk', 'fast.edu.pk',
+  'hec.gov.pk', 'sbp.gov.pk', 'fbr.gov.pk', 'nadra.gov.pk', 'psx.com.pk',
+  'jazz.com.pk', 'zong4g.com', 'telenor.com.pk', 'ufone.com',
+  'hbl.com', 'ubl.com.pk', 'mcbbank.com', 'mezanbank.com', 'alliedbank.com',
+  'daraz.pk', 'foodpanda.com.pk', 'careem.com',
+  // Government / international orgs
+  'gov.pk', 'who.int', 'un.org', 'imf.org', 'worldbank.org',
+];
+
+function isTrustedDomain(hostname: string): boolean {
+  const h = hostname.toLowerCase().replace(/^www\./, '');
+  return TRUSTED_DOMAINS.some(td => h === td || h.endsWith('.' + td));
+}
+
 export class UrlAnalyzer {
   async analyzeUrl(url: string): Promise<UrlAnalysisResult> {
     let parsed: URL;
@@ -81,6 +110,30 @@ export class UrlAnalyzer {
 
     const { domain, subdomain, tld } = this.parseUrl(url);
     const isHttps = parsed.protocol === 'https:';
+    const hostname = parsed.hostname.toLowerCase();
+
+    // ── TRUSTED DOMAIN FAST-PATH ──
+    // Well-known safe domains (google.com, github.com, etc.) get score=0 instantly.
+    // Avoids false positives from minor indicators like redirects or SSL checks.
+    if (isTrustedDomain(hostname)) {
+      return {
+        url,
+        domain,
+        subdomain,
+        tld,
+        isHttps,
+        hasRedirect: false,
+        indicators: [],
+        riskScore: 0,
+        riskLevel: 'safe',
+        analysis: `"${hostname}" is a well-known trusted domain. No threats detected.`,
+        contentAnalysis: undefined,
+        pageExists: true,
+        sslIssuer: undefined,
+        responseTime: undefined,
+      };
+    }
+
     const indicators: UrlIndicator[] = [];
 
     // NOTE: HTTPS is NOT a safety signal — most phishing sites now use free SSL (Let's Encrypt)
@@ -92,7 +145,6 @@ export class UrlAnalyzer {
       indicators.push(shortenerIndicator);
     }
 
-    const hostname = parsed.hostname.toLowerCase();
     for (const blocked of BLOCKED_HOSTNAMES) {
       if (hostname === blocked || hostname.includes(blocked)) {
         indicators.push({
@@ -751,7 +803,7 @@ export class UrlAnalyzer {
       });
 
       responseTime = Date.now() - startTime;
-      pageExists = response.ok || response.status === 301 || response.status === 302;
+      pageExists = response.ok || [301, 302, 303, 307, 308].includes(response.status);
       finalUrl = response.url || url;
 
       // Extract SSL issuer from response headers if available
@@ -766,26 +818,37 @@ export class UrlAnalyzer {
     } catch (error: any) {
       const errorMsg = error?.message || '';
 
+      // DNS failure = domain truly doesn't exist — only then use PAGE_NOT_FOUND
       if (errorMsg.includes('ENOTFOUND') || errorMsg.includes('getaddrinfo')) {
         indicators.push({
           indicator: 'PAGE_NOT_FOUND',
           severity: 'critical',
-          description: 'Page does not exist — domain has no web server at this address',
-          evidence: `Fetch to "${url}" failed: domain not found`,
+          description: 'Domain does not exist in DNS — no web server at this address',
+          evidence: `DNS lookup for "${hostname}" failed: domain not found`,
         });
-      } else if (errorMsg.includes('ECONNREFUSED') || errorMsg.includes('ETIMEDOUT') || errorMsg.includes('ECONNRESET')) {
+      } else if (errorMsg.includes('ECONNREFUSED') || errorMsg.includes('ECONNRESET')) {
+        // Connection refused/reset ≠ page not found. Server may be blocking non-browser requests.
         indicators.push({
-          indicator: 'PAGE_UNREACHABLE',
-          severity: 'high',
-          description: 'Page cannot be reached — server is down or blocking connections',
-          evidence: `Fetch failed: ${errorMsg}`,
+          indicator: 'SERVER_BLOCKING',
+          severity: 'low',
+          description: 'Server is blocking automated requests — page may still exist',
+          evidence: `Connection refused/reset: ${errorMsg}`,
         });
-      } else if (errorMsg.includes('aborted') || errorMsg.includes('timeout')) {
+      } else if (errorMsg.includes('ETIMEDOUT') || errorMsg.includes('aborted') || errorMsg.includes('timeout')) {
+        // Timeout ≠ page not found. Server may be slow or geo-restricted.
         indicators.push({
           indicator: 'PAGE_TIMEOUT',
-          severity: 'medium',
-          description: 'Page load timed out — server may be slow or overloaded',
+          severity: 'low',
+          description: 'Request timed out — server may be slow, geo-restricted, or blocking cloud IPs',
           evidence: `Request timed out after 12 seconds`,
+        });
+      } else {
+        // Generic fetch failure — don't claim page doesn't exist, just say we couldn't verify
+        indicators.push({
+          indicator: 'FETCH_FAILED',
+          severity: 'low',
+          description: 'Could not fetch page content — page may still exist',
+          evidence: `Fetch error: ${errorMsg}`,
         });
       }
 
@@ -798,7 +861,7 @@ export class UrlAnalyzer {
           socialMediaBrands: [],
           topicCategory: 'unknown',
           isParkedDomain: false,
-          isEmptyPage: true,
+          isEmptyPage: false, // Don't claim empty — we just couldn't fetch
           suspiciousScripts: 0,
           externalLinks: 0,
           formActionExternal: false,
@@ -1322,7 +1385,7 @@ export class UrlAnalyzer {
     const hasSslIssue = indicatorIds.includes('SSL_SELF_SIGNED')
       || indicatorIds.includes('SSL_EXPIRED')
       || indicatorIds.includes('SSL_HOSTNAME_MISMATCH');
-    const hasPageNotFound = indicatorIds.includes('PAGE_NOT_FOUND') || indicatorIds.includes('PAGE_UNREACHABLE');
+    const hasPageNotFound = indicatorIds.includes('PAGE_NOT_FOUND'); // Only real DNS ENOTFOUND now
     const hasEmptyPage = indicatorIds.includes('EMPTY_PAGE');
     const hasHttpError = indicatorIds.includes('HTTP_ERROR');
     const hasPasswordForm = indicatorIds.includes('PASSWORD_FORM') || indicatorIds.includes('CREDENTIAL_COLLECTION');

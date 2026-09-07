@@ -207,7 +207,16 @@ class DocumentIntelligenceService {
 
       const requestPayload = {
         messages: [
-          { role: 'system' as const, content: `You are a world-class document analysis expert. You analyze academic and professional documents with extreme precision. You give SPECIFIC, ACTIONABLE feedback — not generic advice. You reference actual text from the document. You are strict but fair.` },
+          { role: 'system' as const, content: `You are a world-class document analysis expert. You analyze academic and professional documents with extreme precision. You give SPECIFIC, ACTIONABLE feedback — not generic advice. You reference actual text from the document. You are strict but fair.
+
+SCORING GUIDELINES:
+- 90-100: Exceptional — ready to submit as-is
+- 75-89: Strong — minor improvements only
+- 60-74: Good foundation — needs targeted work
+- 40-59: Below average — significant gaps
+- 0-39: Poor — major rewrite needed
+- AVERAGE documents score 55-70. Only truly exceptional work scores 85+.
+- Do NOT inflate scores. Most student documents should score 45-70.` },
           { role: 'user' as const, content: `Analyze this ${typeLabel} document. Be EXTREMELY specific and detailed.
 
 DOCUMENT CONTENT:
@@ -232,16 +241,17 @@ Respond in EXACTLY this JSON format (no markdown, no code fences):
 }
 
 RULES:
-- Scores must reflect ACTUAL quality, not be generous
-- strengths must reference SPECIFIC parts of the document
-- improvements must tell EXACTLY what to add/change
-- suggestions must quote REAL text from the document
+- Scores must reflect ACTUAL quality using the scoring guidelines above — be strict, not generous
+- strengths must reference SPECIFIC parts of the document — quote actual phrases
+- improvements must tell EXACTLY what to add/change — be specific
+- suggestions must quote REAL text from the document and provide concrete rewrites
+- Limit suggestions to max 5 most impactful ones
 - If document is a CV: check for quantified achievements, action verbs, relevant skills, proper formatting
 - If document is an SOP: check for clear goals, specific examples, why this program, research fit
 - If document is a cover letter: check for company knowledge, specific role fit, enthusiasm
 - If document is a recommendation letter: check for specific examples, comparison to peers, credibility
 - personName: extract the name of the person this document is ABOUT
-- Be harsh but fair. A 50/100 means genuinely needs work.` }
+- Be harsh but fair. A 50/100 means genuinely needs work. Most documents score 55-70.` }
         ],
         model: process.env.AI_MODEL || 'openai/gpt-oss-20b',
         temperature: 0.3,
@@ -427,10 +437,11 @@ RULES:
   }
 
   private calculateStructureScore(wordCount: number, sentenceCount: number, paragraphCount: number): number {
-    let score = 50;
+    let score = 40;
     if (wordCount >= 200 && wordCount <= 2000) score += 15;
     else if (wordCount > 2000) score += 5;
-    else if (wordCount < 50) score -= 20;
+    else if (wordCount < 50) score -= 15;
+    else if (wordCount < 100) score -= 5;
 
     if (sentenceCount >= 5) score += 10;
     if (paragraphCount >= 3) score += 10;
@@ -438,17 +449,19 @@ RULES:
 
     const avgWordsPerSentence = sentenceCount > 0 ? wordCount / sentenceCount : 0;
     if (avgWordsPerSentence >= 10 && avgWordsPerSentence <= 25) score += 10;
+    else if (avgWordsPerSentence > 30) score -= 5;
 
     return Math.min(100, Math.max(0, score));
   }
 
   private calculateClarityScore(content: string): number {
-    let score = 65;
+    let score = 55;
     const sentences = content.split(/[.!?]+/).filter(Boolean);
     const avgWordsPerSentence = sentences.length > 0 ? content.split(/\s+/).length / sentences.length : 0;
 
     if (avgWordsPerSentence <= 20) score += 10;
     else if (avgWordsPerSentence > 30) score -= 15;
+    else if (avgWordsPerSentence > 25) score -= 5;
 
     const complexWords = ['utilize', 'commence', 'terminate', 'facilitate', 'subsequently', 'aforementioned', 'furthermore', 'nevertheless'];
     const foundComplex = complexWords.filter((w) => content.toLowerCase().includes(w)).length;
@@ -465,7 +478,7 @@ RULES:
   }
 
   private calculateGrammarScore(content: string): number {
-    let score = 70;
+    let score = 60;
 
     const doubleSpaceRegex = /  +/g;
     if (doubleSpaceRegex.test(content)) score -= 5;
@@ -491,7 +504,7 @@ RULES:
   }
 
   private calculateRelevanceScore(content: string, documentType: string, targetInstitution?: string, targetProgram?: string): number {
-    let score = 50;
+    let score = 40;
     const lowerContent = content.toLowerCase();
 
     const typeKeywords: Record<string, string[]> = {
@@ -583,6 +596,7 @@ RULES:
     const suggestions: Suggestion[] = [];
     const sentences = content.split(/[.!?]+/).filter(Boolean);
     const lower = content.toLowerCase();
+    let fillerSuggestionAdded = false;
 
     // Check for passive voice in first few sentences
     sentences.forEach((sentence, i) => {
@@ -599,19 +613,20 @@ RULES:
           });
         }
       }
-
-      // Filler words
-      const fillerMatch = trimmed.match(/\b(very|really|quite|just|basically|actually|literally)\b/gi);
-      if (fillerMatch) {
-        suggestions.push({
-          category: 'conciseness',
-          severity: 'low',
-          originalText: trimmed.slice(0, 80) + (trimmed.length > 80 ? '...' : ''),
-          suggestedText: trimmed.replace(/\b(very|really|quite|just|basically|actually|literally)\b/gi, '').trim().slice(0, 80),
-          explanation: 'Remove filler words — they weaken your message. "I am very passionate" → "I am passionate"',
-        });
-      }
     });
+
+    // Single consolidated filler word suggestion (not per-sentence)
+    const fillerCount = (content.match(/\b(very|really|quite|just|basically|actually|literally)\b/gi) || []).length;
+    if (fillerCount >= 2 && !fillerSuggestionAdded) {
+      fillerSuggestionAdded = true;
+      suggestions.push({
+        category: 'conciseness',
+        severity: 'medium',
+        originalText: `${fillerCount} filler words found (very, really, quite, just, basically, actually, literally)`,
+        suggestedText: 'Remove filler words to strengthen your message',
+        explanation: `Found ${fillerCount} filler words. Each one weakens your writing. "I am very passionate" → "I am passionate". Remove them for more impact.`,
+      });
+    }
 
     // Document-type-specific suggestions
     if (documentType === 'sop') {
@@ -708,17 +723,16 @@ RULES:
     const warnings: string[] = [];
     let integrityScore = 100;
 
-    // 1. Exaggeration patterns
+    // 1. Exaggeration patterns (only genuinely suspicious superlatives — not common intensifiers)
     const exaggerationPatterns = [
-      /\b(world[- ]?class|best[- ]?in[- ]?the[- ]?world|number[- ]?one|top[- ]?1%|unparalleled)\b/gi,
-      /\b(definitely|certainly|absolutely|guaranteed|undoubtedly)\b/gi,
+      /\b(world[- ]?class|best[- ]?in[- ]?the[- ]?world|number[- ]?one|top[- ]?1%|unparalleled|unrivaled|peerless)\b/gi,
     ];
 
     exaggerationPatterns.forEach((pattern) => {
       const matches = content.match(pattern);
       if (matches) {
         matches.forEach((match) => {
-          flaggedClaims.push(`Potentially exaggerated claim: "${match}"`);
+          flaggedClaims.push(`Potentially exaggerated claim: "${match}" — consider toning down or providing evidence`);
           integrityScore -= 3;
         });
       }
@@ -734,9 +748,9 @@ RULES:
       });
     }
 
-    // 3. Suspicious terms (bought, fake, fabricated, etc.)
+    // 3. Suspicious terms (only genuinely fraudulent — not normal professional words)
     const suspiciousPatterns = [
-      /\b(paid|bought|purchased|fake|fabricated|plagiarized)\b/gi,
+      /\b(fake|fabricated|plagiarized|counterfeit|forged)\b/gi,
     ];
 
     suspiciousPatterns.forEach((pattern) => {
